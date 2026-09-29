@@ -1,6 +1,6 @@
 {
 	"name": "create-suede",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Start a new project from the suede template",
 	"type": "module",
 	"license": "UNLICENSED",
@@ -8,8 +8,34 @@
 		"type": "git",
 		"url": "git+https://github.com/taurean/create-suede.git"
 	},
+	"bin": {
+		"create-suede": "./dist/index.mjs"
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"check": "tsc",
+		"lint": "prettier --check .",
+		"format": "prettier --write .",
+		"test": "vitest --run",
+		"prepublishOnly": "pnpm build"
+	},
 	"engines": {
 		"node": ">=22"
 	},
-	"packageManager": "pnpm@10.6.0"
+	"packageManager": "pnpm@10.6.0",
+	"dependencies": {
+		"@bomb.sh/args": "^0.3.1",
+		"@clack/prompts": "^1.8.1",
+		"giget": "^3.3.1"
+	},
+	"devDependencies": {
+		"@types/node": "22",
+		"prettier": "^3.9.9",
+		"tsdown": "^0.23.0",
+		"typescript": "^7.0.2",
+		"vitest": "^5.0.2"
+	}
 }
