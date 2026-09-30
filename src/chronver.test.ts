@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { latestChronverTag, parseChronver, todayChronver } from './chronver.ts';
+import { latestChronverTag, nextChronver, parseChronver, todayChronver } from './chronver.ts';
 
 describe('parseChronver', () => {
 	it('accepts day, changeset, and label forms', () => {
@@ -41,5 +41,22 @@ describe('latestChronverTag', () => {
 
 	it('returns undefined when no tag is chronver', () => {
 		expect(latestChronverTag('aaa\trefs/tags/v1.0.0\n')).toBeUndefined();
+	});
+});
+
+describe('nextChronver', () => {
+	it("uses today's date when nothing has used it", () => {
+		expect(nextChronver('2026.9.30', ['2026.9.29', '2026.9.29.1'])).toBe('2026.9.30');
+	});
+
+	it('adds .N after the highest same-day release', () => {
+		expect(nextChronver('2026.9.30', ['2026.9.30'])).toBe('2026.9.30.1');
+		expect(nextChronver('2026.9.30', ['2026.9.30', '2026.9.30.1', '2026.9.30.2'])).toBe(
+			'2026.9.30.3'
+		);
+	});
+
+	it('ignores non-chronver tags and other days', () => {
+		expect(nextChronver('2026.9.30', ['v1.0.0', '0.3.0', '2026.10.30'])).toBe('2026.9.30');
 	});
 });

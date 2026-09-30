@@ -3,6 +3,7 @@ import { parse } from '@bomb.sh/args';
 import * as prompts from '@clack/prompts';
 import { DONE_USAGE, runDone } from '../done.ts';
 import { NEW_USAGE, runNew } from '../new.ts';
+import { RELEASE_USAGE, runRelease, runReleaseTag } from '../release.ts';
 import { runTask, TASK_USAGE } from '../task.ts';
 
 const USAGE = `Usage: suede <command>
@@ -11,17 +12,20 @@ Commands:
   new [name]              ${NEW_USAGE}
   task <type>/<slug>      ${TASK_USAGE}
   done                    ${DONE_USAGE}
+  release [level] [--tag] ${RELEASE_USAGE}
 
 Options:
   -h, --help   Show this message`;
 
+const args = parse(process.argv.slice(2), { boolean: ['help', 'tag'], alias: { h: 'help' } });
+
 const COMMANDS: Record<string, (rest: string[]) => Promise<void>> = {
 	new: (rest) => runNew(rest[0]),
 	task: (rest) => runTask(rest[0]),
-	done: () => runDone()
+	done: () => runDone(),
+	release: (rest) => (args.tag ? runReleaseTag() : runRelease(rest[0]))
 };
 
-const args = parse(process.argv.slice(2), { boolean: ['help'], alias: { h: 'help' } });
 const [command, ...rest] = args._.map(String);
 const handler = command === undefined ? undefined : COMMANDS[command];
 

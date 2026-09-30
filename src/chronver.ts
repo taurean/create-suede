@@ -57,3 +57,23 @@ export function latestChronverTag(
 	}
 	return latest && { tag: latest.tag, commit: latest.commit };
 }
+
+/**
+ * Today's chronver, or today's with `.N` when a release already used today's date.
+ * `taken` is every version already released (tags, and main's package.json).
+ */
+export function nextChronver(today: string, taken: string[]): string {
+	const base = parseChronver(today);
+	if (!base) throw new Error(`Not a chronver date: ${today}`);
+	const sameDay = taken
+		.map(parseChronver)
+		.filter(
+			(version): version is Chronver =>
+				version !== undefined &&
+				version.year === base.year &&
+				version.month === base.month &&
+				version.day === base.day
+		);
+	if (sameDay.length === 0) return today;
+	return `${today}.${Math.max(...sameDay.map((version) => version.changeset)) + 1}`;
+}

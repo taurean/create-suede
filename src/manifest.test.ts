@@ -4,6 +4,7 @@ import {
 	applyToDemoPage,
 	applyToPackageLock,
 	applyToWranglerConfig,
+	replaceVersionText,
 	detectIndent
 } from './manifest.ts';
 
@@ -92,5 +93,35 @@ describe('applyToDemoPage', () => {
 
 	it('leaves a page without the placeholders untouched', () => {
 		expect(applyToDemoPage('<h1>Home</h1>', 'demo', 'x')).toBe('<h1>Home</h1>');
+	});
+});
+
+describe('replaceVersionText', () => {
+	it('changes only the version line and keeps formatting', () => {
+		const source = '{\n\t"name": "a",\n\t"version": "1.0.0",\n\t"suede": { "from": "x" }\n}\n';
+		expect(replaceVersionText(source, '1.0.0', '1.1.0', 1)).toBe(
+			'{\n\t"name": "a",\n\t"version": "1.1.0",\n\t"suede": { "from": "x" }\n}\n'
+		);
+	});
+
+	it('changes the lockfile root entries but not a dependency on the same version', () => {
+		const lock = [
+			'{',
+			'  "version": "1.0.0",',
+			'  "packages": {',
+			'    "": { "version": "1.0.0" },',
+			'    "node_modules/dep": { "version": "1.0.0" }',
+			'  }',
+			'}'
+		].join('\n');
+		const result = replaceVersionText(lock, '1.0.0', '2.0.0', 2);
+		expect(result.match(/"version": "2.0.0"/g)).toHaveLength(2);
+		expect(result).toContain('"node_modules/dep": { "version": "1.0.0" }');
+	});
+
+	it('treats dots in the old version literally', () => {
+		expect(replaceVersionText('"version": "2026x9x30"', '2026.9.30', 'n', 1)).toBe(
+			'"version": "2026x9x30"'
+		);
 	});
 });

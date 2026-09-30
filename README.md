@@ -33,11 +33,17 @@ Run these from the project's `main/` checkout or from any task worktree.
 ```bash
 suede task feat/login   # new worktree at ../feat-login on branch feat/login, off the latest main
 suede done              # remove worktrees whose branches are merged, then fast-forward main
+suede release [level]   # commit the version bump on this branch (level: patch|minor|major, semver only)
+suede release --tag     # after the merge: tag main's merge commit with its version and push the tag
 ```
 
 `suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard.
 
 `suede done` fetches and prunes `origin`, then removes each task worktree whose branch has its own commits and is merged into `origin/main`, deleting the local branch with `git branch -d`. It keeps a worktree with uncommitted changes, the one you're standing in, and any branch that hasn't moved since it was created. Then it fast-forwards `main/` when it's on `main` and clean. Merges are detected by ancestry, so squash-merged branches aren't recognised.
+
+`suede release` runs on the branch you're about to merge, with a clean tree. It reads the scheme from `suede.versioning` (or infers it from the version for older projects). Chronver uses today's date, adding `.N` when a tag or `main` already used it; semver asks for patch, minor or major unless you pass one. It rewrites only the version fields in `package.json` and `package-lock.json`, commits them as `chore(release): cut <version>`, and doesn't push. It refuses on `main` or when the branch's last commit is already a release commit.
+
+`suede release --tag` fetches `origin`, reads the version from `origin/main`'s `package.json`, creates an annotated tag on that commit, and pushes only the tag. It refuses when the tag already exists.
 
 ## Development
 
