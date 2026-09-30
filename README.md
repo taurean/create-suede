@@ -26,6 +26,19 @@ Then open Claude Code in the new directory and run `/suede-kickoff`.
 
 `~/Developer/<name>/` is a container: `main/` is the primary checkout, and task worktrees go beside it (`git worktree add ../<type>-<slug> -b <type>/<slug> origin/main`).
 
+## Working in a project
+
+Run these from the project's `main/` checkout or from any task worktree.
+
+```bash
+suede task feat/login   # new worktree at ../feat-login on branch feat/login, off the latest main
+suede done              # remove worktrees whose branches are merged, then fast-forward main
+```
+
+`suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard.
+
+`suede done` fetches and prunes `origin`, then removes each task worktree whose branch has its own commits and is merged into `origin/main`, deleting the local branch with `git branch -d`. It keeps a worktree with uncommitted changes, the one you're standing in, and any branch that hasn't moved since it was created. Then it fast-forwards `main/` when it's on `main` and clean. Merges are detected by ancestry, so squash-merged branches aren't recognised.
+
 ## Development
 
 ```bash
