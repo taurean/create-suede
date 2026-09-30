@@ -1,2 +1,11 @@
 pnpm-lock.yaml
 dist/
+
+# Generated and rewritten by `deciduous update`. CLAUDE.md's generated block is
+# fenced with prettier-ignore markers instead.
+.claude/commands/
+.claude/hooks/
+.claude/settings.json
+.claude/skills/archaeology.md
+.claude/skills/narratives.md
+.claude/skills/pulse.md
