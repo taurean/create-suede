@@ -4,7 +4,9 @@ import { run } from './exec.ts';
 import { commit, createBranch, initRepository, stageFiles, untrackedFiles } from './git.ts';
 import {
 	applyToPackageJson,
+	applyToDemoPage,
 	applyToPackageLock,
+	applyToWranglerConfig,
 	detectIndent,
 	type ProjectFields
 } from './manifest.ts';
@@ -58,7 +60,7 @@ export function bootstrapSteps(
 			run: () => initRepository(projectDir)
 		},
 		{
-			title: 'Writing package.json',
+			title: 'Naming the project',
 			run: async () => {
 				await rewriteJson(join(projectDir, 'package.json'), (manifest) =>
 					applyToPackageJson(manifest, fields)
@@ -66,6 +68,16 @@ export function bootstrapSteps(
 				const lockPath = join(projectDir, 'package-lock.json');
 				if (await pathExists(lockPath)) {
 					await rewriteJson(lockPath, (lock) => applyToPackageLock(lock, fields));
+				}
+				const wranglerPath = join(projectDir, 'wrangler.jsonc');
+				if (await pathExists(wranglerPath)) {
+					const source = await readFile(wranglerPath, 'utf8');
+					await writeFile(wranglerPath, applyToWranglerConfig(source, fields.name));
+				}
+				const demoPagePath = join(projectDir, 'src/routes/+page.svelte');
+				if (await pathExists(demoPagePath)) {
+					const source = await readFile(demoPagePath, 'utf8');
+					await writeFile(demoPagePath, applyToDemoPage(source, fields.name, fields.description));
 				}
 			}
 		},

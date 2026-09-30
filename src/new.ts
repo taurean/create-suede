@@ -3,13 +3,14 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import * as prompts from '@clack/prompts';
 import { KICKOFF_BRANCH, bootstrapSteps } from './bootstrap.ts';
+import { copyToClipboard } from './clipboard.ts';
 import { isInstalled } from './exec.ts';
 import { findMissingTools, REQUIRED_TOOLS } from './preflight.ts';
 import { validateProjectName } from './project-name.ts';
 import { createRemote, type Visibility } from './remote.ts';
 import { paint, tildify, wordmark } from './style.ts';
 import { resolveLatestTag } from './template.ts';
-import { defaultVersion, validateVersion, type Versioning } from './versioning.ts';
+import { defaultVersion, type Versioning } from './versioning.ts';
 
 export const NEW_USAGE = 'Creates ~/Developer/<name>/main from the latest suede release.';
 
@@ -93,22 +94,21 @@ export async function runNew(argumentName: string | undefined): Promise<void> {
 		await prompts.select<Versioning>({
 			message: 'Versioning',
 			options: [
-				{ value: 'chronver', label: 'Chronver', hint: 'apps and sites · YYYY.M.D' },
-				{ value: 'semver', label: 'Semver', hint: 'libraries with dependents · MAJOR.MINOR.PATCH' }
+				{
+					value: 'chronver',
+					label: 'Chronver',
+					hint: `apps and sites · starts at ${defaultVersion('chronver')}`
+				},
+				{
+					value: 'semver',
+					label: 'Semver',
+					hint: `libraries with dependents · starts at ${defaultVersion('semver')}`
+				}
 			],
 			initialValue: 'chronver'
 		})
 	);
-
-	const suggestedVersion = defaultVersion(versioning);
-	const version = exitIfCancelled(
-		await prompts.text({
-			message: 'First version',
-			placeholder: suggestedVersion,
-			defaultValue: suggestedVersion,
-			validate: (value) => (value ? validateVersion(versioning, value) : undefined)
-		})
-	);
+	const version = defaultVersion(versioning);
 
 	const remote = await askRemote();
 
@@ -154,10 +154,14 @@ export async function runNew(argumentName: string | undefined): Promise<void> {
 		);
 	}
 
+	const cdCommand = `cd ${tildify(projectDir)}`;
+	const copied = await copyToClipboard(cdCommand);
 	prompts.note(
-		[`cd ${tildify(projectDir)}`, 'claude', '/suede-kickoff']
-			.map((line) => paint('cyan', line))
-			.join('\n'),
+		[
+			`${paint('cyan', cdCommand)}${copied ? paint('dim', '  ← copied') : ''}`,
+			paint('cyan', 'claude'),
+			paint('cyan', '/suede-kickoff')
+		].join('\n'),
 		`Next, on ${KICKOFF_BRANCH}`
 	);
 	prompts.outro(remoteUrl ? paint('underline', remoteUrl) : paint('dim', tildify(projectDir)));
