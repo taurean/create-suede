@@ -72,3 +72,22 @@ export function applyToDemoPage(source: string, name: string, description: strin
 		.replace(DEMO_HEADING, `<h1>${escapeSvelteText(name)}</h1>`)
 		.replace(DEMO_TAGLINE, `<p>${escapeSvelteText(description)}</p>`);
 }
+
+/**
+ * Replaces the first `count` `"version": "<from>"` fields as text, leaving the rest
+ * of the file byte-for-byte. package.json has one; package-lock.json has two at the
+ * top (the root and its `packages[""]` entry), ahead of any dependency.
+ */
+export function replaceVersionText(
+	source: string,
+	from: string,
+	to: string,
+	count: number
+): string {
+	const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const field = new RegExp(`("version"\\s*:\\s*)"${escaped}"`, 'g');
+	let replaced = 0;
+	return source.replace(field, (match, key: string) =>
+		replaced++ < count ? `${key}${JSON.stringify(to)}` : match
+	);
+}
