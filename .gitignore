@@ -1,4 +1,11 @@
 node_modules/
 dist/
-.deciduous/*
 tmp/
+
+# Deciduous database (local). The sync/ event log is the shared record in
+# multi-user setups and is the one thing under .deciduous/ that gets committed.
+.deciduous/*
+!.deciduous/sync/
+
+# Deciduous exported web viewer (regenerated per machine via `deciduous sync`)
+docs/
