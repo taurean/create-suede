@@ -4,7 +4,7 @@ export const REQUIRED_TOOLS = {
 	git: 'https://git-scm.com/downloads',
 	node: 'https://nodejs.org',
 	pnpm: 'https://pnpm.io/installation',
-	deciduous: 'https://github.com/anomalyco/deciduous (cargo install deciduous)'
+	deciduous: 'brew tap notactuallytreyanastasio/tap && brew install deciduous'
 } as const;
 
 export async function findMissingTools(): Promise<(keyof typeof REQUIRED_TOOLS)[]> {

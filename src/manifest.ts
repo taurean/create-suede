@@ -1,6 +1,9 @@
+import type { Versioning } from './versioning.ts';
+
 export interface ProjectFields {
 	name: string;
 	version: string;
+	versioning: Versioning;
 	description: string;
 	suedeTag: string;
 }
@@ -15,7 +18,7 @@ export function applyToPackageJson(manifest: Manifest, fields: ProjectFields): M
 		name: fields.name,
 		version: fields.version,
 		description: fields.description,
-		suede: { from: fields.suedeTag }
+		suede: { from: fields.suedeTag, versioning: fields.versioning }
 	};
 }
 
