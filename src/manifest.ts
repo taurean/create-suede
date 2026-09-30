@@ -39,3 +39,13 @@ export function applyToPackageLock(lock: Manifest, fields: ProjectFields): Manif
 export function detectIndent(json: string): string {
 	return /^[ \t]+(?=")/m.exec(json)?.[0] ?? '\t';
 }
+
+const WRANGLER_NAME_PATTERN = /("name"\s*:\s*)"[^"]*"/;
+
+/**
+ * Sets the Worker name in wrangler.jsonc. The file is JSONC (comments allowed),
+ * so it's edited as text: the first `"name"` field is the top-level Worker name.
+ */
+export function applyToWranglerConfig(source: string, name: string): string {
+	return source.replace(WRANGLER_NAME_PATTERN, `$1${JSON.stringify(name)}`);
+}

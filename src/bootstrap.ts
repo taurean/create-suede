@@ -5,6 +5,7 @@ import { commit, createBranch, initRepository, stageFiles, untrackedFiles } from
 import {
 	applyToPackageJson,
 	applyToPackageLock,
+	applyToWranglerConfig,
 	detectIndent,
 	type ProjectFields
 } from './manifest.ts';
@@ -58,7 +59,7 @@ export function bootstrapSteps(
 			run: () => initRepository(projectDir)
 		},
 		{
-			title: 'Writing package.json',
+			title: 'Naming the project',
 			run: async () => {
 				await rewriteJson(join(projectDir, 'package.json'), (manifest) =>
 					applyToPackageJson(manifest, fields)
@@ -66,6 +67,11 @@ export function bootstrapSteps(
 				const lockPath = join(projectDir, 'package-lock.json');
 				if (await pathExists(lockPath)) {
 					await rewriteJson(lockPath, (lock) => applyToPackageLock(lock, fields));
+				}
+				const wranglerPath = join(projectDir, 'wrangler.jsonc');
+				if (await pathExists(wranglerPath)) {
+					const source = await readFile(wranglerPath, 'utf8');
+					await writeFile(wranglerPath, applyToWranglerConfig(source, fields.name));
 				}
 			}
 		},
