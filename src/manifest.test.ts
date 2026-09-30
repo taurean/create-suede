@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	applyToPackageJson,
+	applyToDemoPage,
 	applyToPackageLock,
 	applyToWranglerConfig,
 	detectIndent
@@ -71,5 +72,25 @@ describe('applyToWranglerConfig', () => {
 
 	it('leaves a config without a name untouched', () => {
 		expect(applyToWranglerConfig('{ "main": "x.js" }', 'demo')).toBe('{ "main": "x.js" }');
+	});
+});
+
+describe('applyToDemoPage', () => {
+	it('replaces the placeholder heading and tagline', () => {
+		const page = '<h1>suede</h1>\n<p>a template repo.</p>\n';
+		expect(applyToDemoPage(page, 'snark-jar', 'like a swear jar, but for snark')).toBe(
+			'<h1>snark-jar</h1>\n<p>like a swear jar, but for snark</p>\n'
+		);
+	});
+
+	it('escapes characters Svelte would treat as markup or expressions', () => {
+		const page = '<h1>suede</h1>\n<p>a template repo.</p>\n';
+		expect(applyToDemoPage(page, 'demo', 'uses {braces} & <tags>')).toContain(
+			'<p>uses &#123;braces&#125; &amp; &lt;tags&gt;</p>'
+		);
+	});
+
+	it('leaves a page without the placeholders untouched', () => {
+		expect(applyToDemoPage('<h1>Home</h1>', 'demo', 'x')).toBe('<h1>Home</h1>');
 	});
 });

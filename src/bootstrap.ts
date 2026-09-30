@@ -4,6 +4,7 @@ import { run } from './exec.ts';
 import { commit, createBranch, initRepository, stageFiles, untrackedFiles } from './git.ts';
 import {
 	applyToPackageJson,
+	applyToDemoPage,
 	applyToPackageLock,
 	applyToWranglerConfig,
 	detectIndent,
@@ -72,6 +73,11 @@ export function bootstrapSteps(
 				if (await pathExists(wranglerPath)) {
 					const source = await readFile(wranglerPath, 'utf8');
 					await writeFile(wranglerPath, applyToWranglerConfig(source, fields.name));
+				}
+				const demoPagePath = join(projectDir, 'src/routes/+page.svelte');
+				if (await pathExists(demoPagePath)) {
+					const source = await readFile(demoPagePath, 'utf8');
+					await writeFile(demoPagePath, applyToDemoPage(source, fields.name, fields.description));
 				}
 			}
 		},

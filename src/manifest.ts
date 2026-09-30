@@ -49,3 +49,26 @@ const WRANGLER_NAME_PATTERN = /("name"\s*:\s*)"[^"]*"/;
 export function applyToWranglerConfig(source: string, name: string): string {
 	return source.replace(WRANGLER_NAME_PATTERN, `$1${JSON.stringify(name)}`);
 }
+
+const DEMO_HEADING = '<h1>suede</h1>';
+const DEMO_TAGLINE = '<p>a template repo.</p>';
+
+/** Escapes text for Svelte markup, where `{` and `}` open expressions. */
+function escapeSvelteText(text: string): string {
+	return text
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('{', '&#123;')
+		.replaceAll('}', '&#125;');
+}
+
+/**
+ * Puts the project's name and purpose on suede's demo page. Only the template's
+ * exact placeholder lines are replaced; a page that no longer has them is left as is.
+ */
+export function applyToDemoPage(source: string, name: string, description: string): string {
+	return source
+		.replace(DEMO_HEADING, `<h1>${escapeSvelteText(name)}</h1>`)
+		.replace(DEMO_TAGLINE, `<p>${escapeSvelteText(description)}</p>`);
+}
