@@ -4,6 +4,7 @@ import { applyToPackageJson, applyToPackageLock, detectIndent } from './manifest
 const fields = {
 	name: 'example',
 	version: '2026.9.29',
+	versioning: 'chronver' as const,
 	description: 'An example',
 	suedeTag: '2026.9.29'
 };
@@ -20,7 +21,7 @@ describe('applyToPackageJson', () => {
 			name: 'example',
 			version: '2026.9.29',
 			description: 'An example',
-			suede: { from: '2026.9.29' }
+			suede: { from: '2026.9.29', versioning: 'chronver' }
 		});
 	});
 });

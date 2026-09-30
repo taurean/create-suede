@@ -9,7 +9,8 @@
 		"url": "git+https://github.com/taurean/create-suede.git"
 	},
 	"bin": {
-		"create-suede": "./dist/index.mjs"
+		"create-suede": "./dist/create-suede.mjs",
+		"suede": "./dist/suede.mjs"
 	},
 	"files": [
 		"dist"
