@@ -1,6 +1,7 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { run } from './exec.ts';
+import { remoteUrl } from './decision-graph.ts';
 import { commit, createBranch, initRepository, stageFiles, untrackedFiles } from './git.ts';
 import {
 	applyToPackageJson,
@@ -16,6 +17,9 @@ export const KICKOFF_BRANCH = 'chore/suede-kickoff';
 
 /** Where `deciduous init` writes the Claude Code integration that belongs in the first commit. */
 const DECIDUOUS_OUTPUT_PATHS = ['.claude', 'CLAUDE.md'];
+
+/** Template files `deciduous init` rewrites for a git-synced graph; restored after it runs. */
+const DECIDUOUS_REWRITTEN_PATHS = ['.gitignore', '.gitattributes'];
 
 export interface BootstrapStep {
 	title: string;
@@ -88,9 +92,38 @@ export function bootstrapSteps(
 			}
 		},
 		{
+			// deciduous 1.x refuses to init without a graph server, and with no terminal it
+			// can't ask which one. The workspace is named for the project: left to deciduous,
+			// it would be the directory name, `main`, for every fork.
+			title: 'Connecting the decision graph server',
+			run: async () => {
+				await run('deciduous', ['remote', 'setup', '--local'], projectDir);
+				const config = await readFile(join(projectDir, '.deciduous/config.toml'), 'utf8');
+				await run(
+					'deciduous',
+					['remote', 'init', remoteUrl(config), '--workspace', fields.name],
+					projectDir
+				);
+			}
+		},
+		{
 			title: 'Initializing the decision graph',
 			run: async () => {
+				// `deciduous init` writes git-sync rules (tracking .deciduous/config.toml and
+				// graph.json, a graph.json merge driver) even when a server is configured, and
+				// that config names this machine's server port. The template's versions of these
+				// files already describe a server-backed graph, so they win.
+				const templateOwned = await Promise.all(
+					DECIDUOUS_REWRITTEN_PATHS.map(async (path) => {
+						const fullPath = join(projectDir, path);
+						return { fullPath, source: await readFile(fullPath, 'utf8').catch(() => null) };
+					})
+				);
 				await run('deciduous', ['init'], projectDir);
+				for (const { fullPath, source } of templateOwned) {
+					if (source === null) await rm(fullPath, { force: true });
+					else await writeFile(fullPath, source);
+				}
 			}
 		},
 		{
