@@ -53,12 +53,14 @@ Based on $ARGUMENTS:
 - `add decision <title>` -> `deciduous add decision "<title>" -c 75`
 - `add option <title>` -> `deciduous add option "<title>" -c 70`
 - `add action <title>` -> `deciduous add action "<title>" -c 85`
-- `add obs <title>` -> `deciduous add observation "<title>" -c 80`
+- `add obs <title> -d <description>` -> `deciduous add observation "<title>" -c 80 -d "<description>"`
+  - **Observations MUST have both a title (short summary) and description (full detail)**
 - `add outcome <title>` -> `deciduous add outcome "<title>" -c 90`
 - `add revisit <title>` -> `deciduous add revisit "<title>" -c 75`
 
 ### Optional Flags for Nodes
 - `-c, --confidence <0-100>` - Confidence level
+- `-d, --description "..."` - Description (**REQUIRED for observations** - the detail behind the title)
 - `-p, --prompt "..."` - Store the user prompt that triggered this node
 - `-f, --files "file1.rs,file2.rs"` - Associate files with this node
 - `-b, --branch <name>` - Git branch (auto-detected by default)
@@ -167,24 +169,16 @@ The graph viewer shows a branch dropdown in the stats bar:
 - `doc detach <id>` -> `deciduous doc detach <id>` (soft-delete)
 - `doc gc` -> `deciduous doc gc` (garbage-collect orphaned files)
 
-### Sync Graph
-- `sync` -> `deciduous sync`
+### The graph server (this project has a `[remote]`)
+- `sync` -> `deciduous remote status` (what differs between this copy and the server; exit 1 if anything)
+- `pull` -> `deciduous remote pull` (send what is waiting, then refresh the local cache from the server)
+- `push` -> `deciduous remote push` (send writes still waiting in `.deciduous/remote-log.jsonl`)
+- Node references: every command that takes a node id also takes a `change_id` prefix (the CHANGE column in `deciduous nodes`). Use the prefix to point at a teammate's node, since local ids differ per machine.
 
-### Multi-User Sync (Event-Based) - RECOMMENDED
-- `events init` -> `deciduous events init` (initialize event-based sync)
-- `events status` -> `deciduous events status` (show pending events)
-- `events rebuild` -> `deciduous events rebuild` (apply teammate events)
-- `events checkpoint` -> `deciduous events checkpoint` (create snapshot)
-- `events checkpoint --clear-events` -> snapshot and clear old events
-
-### Multi-User Sync (Legacy Diff/Patch)
-- `diff export -o <file>` -> `deciduous diff export -o <file>` (export nodes as patch)
-- `diff export --nodes 1-10 -o <file>` -> export specific nodes
-- `diff export --branch feature-x -o <file>` -> export nodes from branch
-- `diff apply <file>` -> `deciduous diff apply <file>` (apply patch, idempotent)
-- `diff apply --dry-run <file>` -> preview without applying
-- `diff status` -> `deciduous diff status` (list patches in .deciduous/patches/)
-- `migrate` -> `deciduous migrate` (add change_id columns for sync)
+### Message board (parallel agents)
+- `board post --as <label> -s "subject" -m "body @other"` -> post; `--reply-to <id>` answers a message
+- `board read --unanswered <label>` -> what is waiting for you; also `--since`, `--from`, `--to`, `-q`, `--json`
+- `board show <id>` -> one message in full
 
 ### Export & Visualization
 - `dot` -> `deciduous dot` (output DOT to stdout)
@@ -202,7 +196,7 @@ The graph viewer shows a branch dropdown in the stats bar:
 | `option` | Possible approach | "Use JWT tokens" |
 | `action` | Something implemented | "Added JWT middleware" |
 | `outcome` | Result of action | "JWT auth working" |
-| `observation` | Finding or data point | "Existing code uses sessions" |
+| `observation` | Finding or data point (title + description) | Title: "Existing code uses sessions", -d: "The legacy auth uses express-session with cookie store, not token-based" |
 | `revisit` | Pivot point / reconsideration | "Reconsidering auth approach" |
 
 ## Edge Types
@@ -215,6 +209,7 @@ The graph viewer shows a branch dropdown in the stats bar:
 | `requires` | Dependency |
 | `blocks` | Preventing progress |
 | `enables` | Makes something possible |
+| `took_from` | Borrowed from that node, usually on another branch |
 
 ## Graph Integrity - CRITICAL
 
@@ -255,7 +250,7 @@ deciduous link <parent_id> <child_id> -r "Retroactive connection - <why>"
 ```
 
 ### When to Audit
-- Before every `deciduous sync`
+- After `deciduous remote pull` brings in other people's nodes
 - After creating multiple nodes quickly
 - At session end
 - When the web UI graph looks disconnected
@@ -279,46 +274,33 @@ deciduous link <parent_id> <child_id> -r "Retroactive connection - <why>"
 - Forces you to review exactly what you're committing
 - Catches unintended changes before they enter git history
 
-## Multi-User Sync
+## The Graph Server
 
-**Problem**: Multiple users work on the same codebase, each with a local `.deciduous/deciduous.db` (gitignored). How to share decisions?
+This project has a `[remote]` in `.deciduous/config.toml`. The server holds the graph; `.deciduous/deciduous.db` is this machine's cache of it. There is no `.deciduous/graph.json` to commit, no merge driver, and `deciduous sync` is not the step here.
 
-**Solution**: Event-based sync with append-only logs. Each user has their own event file that git merges automatically.
-
-### Event-Based Sync (Recommended)
-
-**Setup (once per repo):**
-```bash
-deciduous events init
-git add .deciduous/sync/
-git commit -m "feat: enable event-based sync"
-```
-
-**Daily workflow:**
-```bash
-git pull                    # Get teammate events
-deciduous events rebuild    # Apply to local DB
-# Work normally - events auto-emit on add/link/etc.
-git add .deciduous/sync/ && git commit -m "sync" && git push
-```
-
-**Periodic maintenance:**
-```bash
-deciduous events checkpoint --clear-events  # Compact old events
-git add .deciduous/sync/ && git commit -m "checkpoint"
-```
-
-### Legacy Patch Workflow
-
-For manual control, use the older patch system:
+Every `add`, `link`, `status`, `delete` is queued in `.deciduous/remote-log.jsonl` and sent before the command exits. A write made while the server is down waits in the log and goes with the next write or `deciduous remote push`. MCP tools write to the server directly.
 
 ```bash
-# Export nodes as a patch file
-deciduous diff export --branch feature-x -o .deciduous/patches/my-feature.json
-
-# Apply patches from teammates
-deciduous diff apply .deciduous/patches/*.json
+deciduous remote status   # every node, edge and document that differs, with the command that fixes it
+deciduous remote pull     # send what is waiting, then refresh the local cache (deletions included)
+deciduous remote push     # send what is waiting; --retry-rejected once a refusal's cause is fixed
 ```
+
+**Linking to a teammate's node:** local ids differ per machine, so use the change_id prefix shown in the CHANGE column of `deciduous nodes`, or the server id an agent quotes:
+```bash
+deciduous nodes                          # 57   a1b2c3d4  goal  ...  (a1b2c3d4 is stable everywhere)
+deciduous link a1b2c3d4 58 -r "builds on their goal"
+```
+
+## Parallel Agents: The Message Board
+
+When more than one agent works at once, coordinate through deciduous, never through a scratch or markdown file. A file has no ids to answer, no way to ask what is waiting for you, and it is gone with the worktree it was written in.
+
+- **Post** interface changes, questions and answers: `post_message` (MCP) or `deciduous board post --as <your-label> -s "subject" -m "body"`. Address other agents with `@label`.
+- **Read** what is waiting for you: `read_messages` with `unanswered_for: "<your-label>"`, or `deciduous board read --unanswered <your-label>`. Do it at start, before touching a file another agent may be changing, and before finishing.
+- **Reply** with `reply_to: <id>` (`--reply-to <id>`). A reply is what takes a question off the asker's list; a new post does not.
+
+One board serves every git worktree of the repository, or the server when the project has a `[remote]`. Messages are not graph nodes: not in `graph.json`, not exported, not synced. With `DECIDUOUS_AGENT_LABEL` set in a session's environment, `board post` uses it for `--as`, and the `board-mentions.sh` hook shows that label's unanswered messages at session start and as new ones arrive.
 
 ## The Rule
 
@@ -326,8 +308,8 @@ deciduous diff apply .deciduous/patches/*.json
 LOG BEFORE YOU CODE, NOT AFTER.
 CONNECT EVERY NODE TO ITS PARENT.
 AUDIT FOR ORPHANS REGULARLY.
-SYNC BEFORE YOU PUSH.
-EXPORT PATCHES FOR YOUR TEAMMATES.
+THE SERVER IS THE TRUTH: `deciduous remote pull` TO REFRESH, `deciduous remote status` TO CHECK.
+COORDINATE PARALLEL AGENTS ON THE BOARD, NEVER IN A SCRATCH FILE.
 ```
 
 **Live graph**: https://notactuallytreyanastasio.github.io/deciduous/

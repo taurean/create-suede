@@ -17,7 +17,7 @@ The name argument is optional; without it, the CLI asks. It asks every question 
 3. Downloads that tag's tarball into `~/Developer/<name>/main`. The tarball holds only suede's tracked files, so there is no `.git` history, `node_modules`, or decision graph to clean up.
 4. Runs `git init` on `main`.
 5. Sets `name`, `version`, `description`, and `"suede": { "from": "<tag>", "versioning": "<scheme>" }` in `package.json`, the matching root fields in `package-lock.json`, the Worker `name` in `wrangler.jsonc`, and the demo page's heading and tagline.
-6. Runs `pnpm install` and `deciduous init`.
+6. Runs `pnpm install`, connects the project to this machine's deciduous graph server (`deciduous remote setup --local`, setting it up on first use) under a workspace named for the project, then runs `deciduous init`. The template's `.gitignore` and `.gitattributes` are kept as downloaded: the graph lives on the server, not in git.
 7. Commits the template files plus what `deciduous init` wrote under `.claude/`, staged by name. The commit message records the suede commit hash.
 8. Creates the `chore/suede-kickoff` branch.
 9. Creates the GitHub repository and pushes `main`, if you chose one.
