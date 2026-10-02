@@ -1,96 +1,51 @@
 ---
-description: Sync decision graph with teammates - pull events, rebuild, push
-allowed-tools: Bash(deciduous:*, git:*)
+description: Check this project's copy of the decision graph against the graph server and refresh it
+allowed-tools: Bash(deciduous:*)
 ---
 
-# Multi-User Sync
+# Sync with the Graph Server
 
-Synchronize decision graph with your team using event-based sync.
+This project has a `[remote]` in `.deciduous/config.toml`. Its graph lives on a shared server, and `.deciduous/deciduous.db` is this machine's cache of it. There is no `.deciduous/graph.json` to pull, commit or merge, and `deciduous sync` is not the step here: CLI writes are queued in `.deciduous/remote-log.jsonl` and sent before each command exits, MCP tools write to the server directly.
 
-## Step 1: Pull Latest
-
-```bash
-git pull --rebase
-```
-
-## Step 2: Check Sync Status
+## Step 1: What differs?
 
 ```bash
-deciduous events status
+deciduous remote status
 ```
 
-Look for:
-- **Pending events**: Events from teammates not yet in your local DB
-- **Event files**: Each teammate has their own `.jsonl` file
+Lists the writes waiting in the log, the ones the server refused, and every node, edge and document that differs between this copy and the server, each with the command that fixes it. Exits 1 when anything differs.
 
-## Step 3: Rebuild if Needed
-
-If there are pending events:
+## Step 2: Refresh
 
 ```bash
-# Preview what would change
-deciduous events rebuild --dry-run
-
-# Apply teammate events to your local database
-deciduous events rebuild
+deciduous remote pull
 ```
 
-## Step 4: Push Your Changes
+Sends what is waiting, then refreshes the local cache from the server, deletions included.
+
+## Step 3: Send what is stuck
 
 ```bash
-# Stage sync files (events are auto-committed to your event file)
-git add .deciduous/sync/
-
-# Commit and push
-git commit -m "sync: decision graph events"
-git push
+deciduous remote push                   # writes still waiting (the server was down)
+deciduous remote push --seed            # rows only this copy has, such as history from before the remote
+deciduous remote push --retry-rejected  # ops the server refused, once the cause is fixed
 ```
 
-## Checkpoint (Periodic Maintenance)
+## Linking across users
 
-To prevent repo bloat, periodically create a checkpoint:
+Local ids differ per machine. Refer to someone else's node by its change_id prefix (the CHANGE column in `deciduous nodes`) or by the server id an agent quotes:
 
 ```bash
-# Create checkpoint and clear old events
-deciduous events checkpoint --clear-events
-
-# Commit the checkpoint
-git add .deciduous/sync/
-git commit -m "checkpoint: compact decision graph events"
-git push
+deciduous link a1b2c3d4 42 -r "our action implements their goal"
 ```
 
-**When to checkpoint:**
-- After major milestones
-- When event files get large (>100KB)
-- Before releases
-
-## Troubleshooting
-
-### Events not syncing?
-
-1. Make sure `.deciduous/sync/` is tracked in git
-2. Check that `deciduous events init` was run
-3. Verify events are being emitted: `deciduous events status`
-
-### Merge conflicts in event files?
-
-Event files are append-only JSONL. Git should auto-merge them.
-If conflicts occur, accept both versions (both sets of events are valid).
-
-### Missing nodes after rebuild?
-
-Nodes reference each other by `change_id` (UUID), not local `id`.
-If edges fail, the referenced node may be in a teammate's events
-that haven't been pulled yet. Pull and rebuild again.
+Agent messages (`deciduous board`) are not part of the graph; with a `[remote]` they live on the server.
 
 ## Quick Reference
 
 | Command | What it does |
 |---------|--------------|
-| `deciduous events status` | Show pending events, authors, file sizes |
-| `deciduous events rebuild` | Apply all events to local DB |
-| `deciduous events rebuild --dry-run` | Preview without applying |
-| `deciduous events checkpoint` | Snapshot current state |
-| `deciduous events checkpoint --clear-events` | Snapshot + delete old events |
-| `deciduous events emit <id>` | Manually emit event for a node |
+| `deciduous remote status` | What differs, and the command that fixes each; exit 1 if anything |
+| `deciduous remote pull` | Send what is waiting, then refresh the local cache |
+| `deciduous remote push` | Send what is waiting in the log |
+| `deciduous nodes` | Shows the CHANGE prefix to use for cross-user links |

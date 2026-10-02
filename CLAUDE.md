@@ -74,11 +74,12 @@ is restated here so the agent doesn't fetch it on first use.
 `CONTEXT.md`, `SYSTEMS_MAP.md`, and `task/testing.md` don't exist yet. Skills
 that read them skip any that are missing.
 
-- `.claude/commands/` and `.claude/hooks/` — generated and maintained by
-  `deciduous update`. Don't hand-edit.
+- `.claude/commands/`, `.claude/hooks/`, `.claude/settings.json`,
+  `.claude/agents.toml`, and the Decision Graph Workflow section at the end of
+  this file — generated and maintained by `deciduous update`. Don't hand-edit.
 
-Durable records of work: the `deciduous` decision graph in `.deciduous/`, the
-project's tracker, and merged PR history. There is no per-task markdown note.
+Durable records of work: the `deciduous` decision graph on the graph server
+(see "Decision graph"), the project's tracker, and merged PR history. There is no per-task markdown note.
 
 ## Constant process pipeline
 
@@ -194,8 +195,15 @@ with the commands and hooks under `.claude/`. It preserves custom content, so
 the house conventions below sit alongside the generated section rather than
 replacing it. Don't restate the generated mechanics here.
 
-**Log in real time, not retroactively.** A pre-edit hook enforces this: an edit
-is blocked unless a goal or action node was logged recently.
+**Log in real time, not retroactively.** Nothing enforces this mechanically:
+deciduous 1.x removed the hook that blocked edits. The graph server's MCP
+instructions restate the rule each session; the discipline is the agent's.
+
+**Point every checkout at the graph server.** `[remote]` lives in the
+gitignored `.deciduous/config.toml`, so run `deciduous remote setup --local`
+once per machine and once in each new worktree. This checkout's directory is
+`main`, so name the workspace: `deciduous remote init <url> --workspace
+create-suede`.
 
 ### What not to log
 
@@ -257,9 +265,8 @@ Claim done with evidence: command plus result.
 | `/document` | Generate comprehensive documentation for a file or directory |
 | `/build-test` | Build the project and run the test suite |
 | `/serve-ui` | Start the decision graph web viewer |
-| `/sync-graph` | Export decision graph to GitHub Pages |
 | `/decision-graph` | Build a decision graph from commit history |
-| `/sync` | Multi-user sync - pull events, rebuild, push |
+| `/sync` | Check this copy against the graph server and refresh it |
 
 ### Available Skills
 
@@ -294,6 +301,11 @@ AFTER it succeeds/fails -> Log the outcome
 CONNECT immediately -> Link every node to its parent
 AUDIT regularly -> Check for missing connections
 ```
+
+Through the MCP tools, create and link in one call: `add_node` with
+`parent_id` set to the node it belongs under. Never send `add_edge` in the
+same batch as the `add_node` whose id it needs: the id does not exist yet,
+and whatever stands in for it (a placeholder, a guess) is refused.
 
 ### Behavioral Triggers - MUST LOG WHEN:
 
@@ -423,7 +435,7 @@ deciduous add goal "Title" -c 90 -p "User's original request"
 deciduous add action "Title" -c 85
 deciduous link FROM TO -r "reason"  # DO THIS IMMEDIATELY!
 deciduous serve   # View live (auto-refreshes every 30s)
-deciduous sync    # Export for static hosting
+deciduous remote status   # What this copy and the graph server disagree on
 
 # Metadata flags
 # -c, --confidence 0-100   Confidence level
@@ -450,24 +462,6 @@ deciduous link <goal_id> <action_id> -r "Implementation"
 
 The `--commit HEAD` flag captures the commit hash and links it to the node. The web viewer will show commit messages, authors, and dates.
 
-### Git History & Deployment
-
-```bash
-# Export graph AND git history for web viewer
-deciduous sync
-
-# This creates:
-# - docs/graph-data.json (decision graph)
-# - docs/git-history.json (commit info for linked nodes)
-```
-
-To deploy to GitHub Pages:
-1. `deciduous sync` to export
-2. Push to GitHub
-3. Settings > Pages > Deploy from branch > /docs folder
-
-Your graph will be live at `https://<user>.github.io/<repo>/`
-
 ### Branch-Based Grouping
 
 Nodes are auto-tagged with the current git branch. Configure in `.deciduous/config.toml`:
@@ -477,7 +471,7 @@ main_branches = ["main", "master"]
 auto_detect = true
 ```
 
-### Audit Checklist (Before Every Sync)
+### Audit Checklist (Before Ending a Session)
 
 1. Does every **outcome** link back to what caused it?
 2. Does every **action** link to why you did it?
@@ -505,29 +499,37 @@ auto_detect = true
 ### Session Start Checklist
 
 ```bash
+deciduous remote pull     # Refresh the local cache from the graph server
+deciduous remote status   # Anything this copy has that the server lacks?
 deciduous check-update    # Update needed? Run 'deciduous update' if yes
                           # (auto-checked every 24h if auto-update is on)
 deciduous nodes           # What decisions exist?
 deciduous edges           # How are they connected? Any gaps?
 deciduous doc list        # Any attached documents to review?
+deciduous board read --unanswered <label>  # parallel agents: anything waiting for you?
 git status                # Current state
 ```
 
-### Multi-User Sync
+### Parallel Agents: The Message Board
 
-Sync decisions with teammates via event logs:
+When more than one agent works at once, coordinate through deciduous, never through a scratch or markdown file. A file has no ids to answer, no way to ask what is waiting for you, and it is gone with the worktree it was written in.
+
+- **Post** interface changes, questions and answers: `post_message` (MCP) or `deciduous board post --as <your-label> -s "subject" -m "body"`. Address other agents with `@label`.
+- **Read** what is waiting for you: `read_messages` with `unanswered_for: "<your-label>"`, or `deciduous board read --unanswered <your-label>`. Do it at start, before touching a file another agent may be changing, and before finishing.
+- **Reply** with `reply_to: <id>` (`--reply-to <id>`). A reply is what takes a question off the asker's list; a new post does not.
+
+One board serves every git worktree of the repository, or the server when the project has a `[remote]`. Messages are not graph nodes: not in `graph.json`, not exported, not synced. With `DECIDUOUS_AGENT_LABEL` set in a session's environment, `board post` uses it for `--as`, and the `board-mentions.sh` hook shows that label's unanswered messages at session start and as new ones arrive.
+
+### The Graph Server
+
+This project has a `[remote]` in `.deciduous/config.toml`: its graph lives on a shared server, and `.deciduous/deciduous.db` is this machine's cache of it. There is no `.deciduous/graph.json` to commit or merge, and `deciduous sync` is not the step here. Every CLI write is queued in `.deciduous/remote-log.jsonl` and sent before the command exits; MCP tools write to the server directly (pass the `workspace` named under `[remote]`).
 
 ```bash
-# Check sync status
-deciduous events status
-
-# Apply teammate events (after git pull)
-deciduous events rebuild
-
-# Compact old events periodically
-deciduous events checkpoint --clear-events
+deciduous remote status   # what differs between this copy and the server (exit 1 if anything)
+deciduous remote pull     # send what is waiting, then refresh the local cache from the server
+deciduous remote push     # send writes still waiting in the log (the server was down)
 ```
 
-Events auto-emit on add/link/status commands. Git merges event files automatically.
+Local node ids differ per machine. To point at someone else's node, use its change_id prefix (the CHANGE column in `deciduous nodes`) or the server id an agent quotes: `deciduous link a1b2c3d4 <id> -r "..."`.
 <!-- deciduous:end -->
 <!-- prettier-ignore-end -->

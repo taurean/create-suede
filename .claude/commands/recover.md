@@ -11,6 +11,10 @@ argument-hint: [focus-area]
 ## Step 1: Query the Graph
 
 ```bash
+# The graph lives on the server; refresh this machine's cache first
+deciduous remote pull
+deciduous remote status
+
 # See all decisions (look for recent ones and pending status)
 deciduous nodes
 
@@ -53,6 +57,17 @@ done
 deciduous link <parent_id> <child_id> -r "Retroactive connection - <reason>"
 ```
 
+## Step 1.7: Check the Message Board
+
+If other agents are working on this project at the same time, read what they have asked you before doing anything else:
+
+```bash
+deciduous board read --unanswered <your-label>   # or read_messages with unanswered_for
+deciduous board read --since <last id you saw>    # everything new, addressed to you or not
+```
+
+Answer each with `deciduous board post --as <your-label> --reply-to <id> ...` (or `post_message` with `reply_to`). Coordinate there, never in a scratch or markdown file.
+
 ## Step 2: Check Git State
 
 ```bash
@@ -76,6 +91,7 @@ cat git.log | tail -30
 5. **Open questions** or unresolved observations
 6. **Attached documents** - diagrams, specs, or screenshots on key nodes
 7. **Suggested next steps**
+8. **Unanswered board messages** addressed to you, if other agents are working in parallel
 
 ### Branch Configuration
 
@@ -96,7 +112,7 @@ After recovering context, you MUST follow the logging workflow:
 EVERY USER REQUEST -> Log goal/decision first
 BEFORE CODE CHANGES -> Log action
 AFTER CHANGES -> Log outcome, link nodes
-BEFORE GIT PUSH -> deciduous sync
+BEFORE ENDING -> deciduous remote status
 ```
 
 **The user is watching the graph live.** Log as you go, not after.
@@ -114,7 +130,7 @@ deciduous link FROM TO -r "Connection reason"
 # Capture prompt when user redirects mid-stream
 deciduous add action "Switching approach" -c 85 -p "User said: use X instead"
 
-deciduous sync  # Do this frequently!
+deciduous remote status  # anything the server has not got?
 ```
 
 **When to use `--prompt`:** On root goals (always) and when user gives new direction mid-stream. Downstream nodes inherit context via edges.
@@ -149,7 +165,7 @@ AFTER CHANGES -> Log outcomes, observations
     |
 AUDIT AGAIN -> Any new orphans?
     |
-BEFORE PUSH -> deciduous sync
+BEFORE ENDING -> deciduous remote status
     |
 PUSH -> Live graph updates
     |
@@ -162,23 +178,9 @@ SESSION END -> Final audit
 
 ---
 
-## Multi-User Sync
+## The Graph Server
 
-If working in a team, sync decision graphs automatically via events:
-
-```bash
-# Check sync status
-deciduous events status
-
-# Apply teammate events (after git pull)
-deciduous events rebuild
-
-# Periodic maintenance (compact old events)
-deciduous events checkpoint --clear-events
-```
-
-Events are auto-emitted when you use `add`, `link`, `status`, etc.
-Git handles merging everyone's event files automatically.
+This project has a `[remote]` in `.deciduous/config.toml`: teammates' and agents' decisions are on the server, not in a file git carries. `deciduous remote pull` brings them into your local cache; `deciduous remote status` lists what differs, each with the command that fixes it. There is no `.deciduous/graph.json` to commit and no `deciduous sync` step. To link to a teammate's node use its change_id prefix (CHANGE column in `deciduous nodes`), not its local id.
 
 ## Why This Matters
 
@@ -186,4 +188,4 @@ Git handles merging everyone's event files automatically.
 - The graph survives - query it early, query it often
 - Retroactive logging misses details - log in the moment
 - The user sees the graph live - show your work
-- Patches share reasoning with teammates
+- The graph server shares reasoning with every teammate and agent as it is written
