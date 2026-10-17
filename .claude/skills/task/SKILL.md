@@ -132,7 +132,14 @@ green suite ([VERIFY-1], [VERIFY-2]).
    The brief's seam assessment is the signal. Anything load-bearing you found
    that isn't a declared contract goes in the area's `Fragile` field
    ([CONTRACT-1]).
-2. Push the branch. Update the PR body if the brief diverged during the task.
-3. Comment on the PR with: whether anything blocks merge, where the human should
+2. Prune the tests this branch added or changed, as the last change before
+   pushing. Delete any test whose outcome nothing outside the unit can
+   influence: one that pins a constant, an internal helper's math, internal
+   state, or an internal selector. Keep the tests driven by what callers
+   control: props, arguments, requests, user settings. Follow
+   [testing.md](testing.md), "Prune pass", when the project has one. The
+   deletions are one `chore(tests): prune` commit.
+3. Push the branch. Update the PR body if the brief diverged during the task.
+4. Comment on the PR with: whether anything blocks merge, where the human should
    focus, and the open-questions queue. Lead with the verdict ([ASK-5]).
-4. Delete the worktree. Return to `main` and pull.
+5. Delete the worktree. Return to `main` and pull.
