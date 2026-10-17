@@ -13,15 +13,6 @@ export async function stageFiles(cwd: string, files: string[]): Promise<void> {
 	}
 }
 
-export async function untrackedFiles(cwd: string, paths: string[]): Promise<string[]> {
-	const output = await run(
-		'git',
-		['ls-files', '--others', '--exclude-standard', '--', ...paths],
-		cwd
-	);
-	return output.split('\n').filter(Boolean);
-}
-
 export async function commit(cwd: string, message: string): Promise<void> {
 	await run('git', ['commit', '--quiet', '-m', message], cwd);
 }

@@ -3,8 +3,7 @@ import { isInstalled } from './exec.ts';
 export const REQUIRED_TOOLS = {
 	git: 'https://git-scm.com/downloads',
 	node: 'https://nodejs.org',
-	pnpm: 'https://pnpm.io/installation',
-	deciduous: 'brew tap notactuallytreyanastasio/tap && brew install deciduous'
+	pnpm: 'https://pnpm.io/installation'
 } as const;
 
 export async function findMissingTools(): Promise<(keyof typeof REQUIRED_TOOLS)[]> {
