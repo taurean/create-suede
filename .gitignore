@@ -2,10 +2,12 @@ node_modules/
 dist/
 tmp/
 
-# Deciduous database (local). The sync/ event log is the shared record in
-# multi-user setups and is the one thing under .deciduous/ that gets committed.
-.deciduous/*
-!.deciduous/sync/
+# Deciduous — the graph lives on the server named in .deciduous/config.toml
+# [remote]; everything under .deciduous/ is a per-machine cache or config.
+.deciduous/
 
-# Deciduous exported web viewer (regenerated per machine via `deciduous sync`)
-docs/
+# `deciduous update` also writes flat .claude/skills/*.md copies of pulse,
+# narratives, and archaeology. Claude Code only loads skills/<name>/SKILL.md,
+# and create-suede keeps those as hand-maintained commands, so the copies stay
+# local.
+.claude/skills/*.md

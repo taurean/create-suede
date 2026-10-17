@@ -186,7 +186,7 @@ If tests are too synthetic (meaningless variable names, unrealistic values):
 4. Create observation node:
 
 ```bash
-deciduous add observation "Refined tests for <component> - made more real-world" -c 85
+deciduous add observation "Refined tests for <component>" -c 85 -d "Made tests more real-world: descriptive variable names, realistic values, scenario comments added"
 deciduous link <action_id> <observation_id> -r "Test improvements during documentation"
 ```
 
@@ -207,8 +207,8 @@ deciduous link <goal_id> <action_id> -r "Documentation complete"
 deciduous add outcome "Documentation complete for <target>" -c 95
 deciduous link <action_id> <outcome_id> -r "Successfully documented"
 
-# Sync
-deciduous sync
+# Anything the graph server has not got?
+deciduous remote status
 ```
 
 ---

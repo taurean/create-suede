@@ -39,6 +39,8 @@ deciduous add action "What you're about to implement" -c 85 -f "file1.rs,file2.r
 deciduous link <goal_id> <action_id> -r "Implementation step"
 ```
 
+**Other agents working at the same time?** Before editing a file another agent may be changing, read `deciduous board read --unanswered <your-label>`, and post an interface change on the board (`deciduous board post --as <your-label> -s "..." -m "@owner ..."`) before you make it. Never coordinate through a scratch or markdown file.
+
 ## Step 4: After Completion
 
 When the work is done:
@@ -48,9 +50,11 @@ When the work is done:
 deciduous add outcome "What was accomplished" -c 95 --commit HEAD
 deciduous link <action_id> <outcome_id> -r "Implementation complete"
 
-# Sync the graph
-deciduous sync
+# Anything the graph server has not got?
+deciduous remote status
 ```
+
+Before you report the work finished, check the board once more (`deciduous board read --unanswered <your-label>`) and answer what is there with `--reply-to <id>`.
 
 ## Step 5: Attach Supporting Documents (Optional)
 
@@ -80,7 +84,7 @@ Outcome node with --commit HEAD (links to action)
     |
 Attach supporting documents (optional)
     |
-deciduous sync
+deciduous remote status
 ```
 
 ## What NOT to Log
@@ -115,8 +119,12 @@ deciduous link <action> <outcome> -r "Complete"
 # Attach documents (optional)
 deciduous doc attach <goal> diagram.png -d "Description"
 
-# Always sync
-deciduous sync
+# Parallel agents: coordinate on the board, not in a file
+deciduous board read --unanswered <label>
+deciduous board post --as <label> -s "subject" -m "@other body" [--reply-to <id>]
+
+# Before finishing: anything the server has not got?
+deciduous remote status
 ```
 
 **Now create the goal node for: $ARGUMENTS**
