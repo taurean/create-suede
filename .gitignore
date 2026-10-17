@@ -1,13 +1,3 @@
 node_modules/
 dist/
 tmp/
-
-# Deciduous — the graph lives on the server named in .deciduous/config.toml
-# [remote]; everything under .deciduous/ is a per-machine cache or config.
-.deciduous/
-
-# `deciduous update` also writes flat .claude/skills/*.md copies of pulse,
-# narratives, and archaeology. Claude Code only loads skills/<name>/SKILL.md,
-# and create-suede keeps those as hand-maintained commands, so the copies stay
-# local.
-.claude/skills/*.md
