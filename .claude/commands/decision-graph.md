@@ -209,7 +209,7 @@ After consolidating, build the graph - one decision chain per narrative, with cr
 deciduous add goal "Title of the goal"
 deciduous add decision "The question or choice point"
 deciduous add option "One possible approach"
-deciduous add observation "Something learned or discovered"
+deciduous add observation "Short summary" -d "Detailed description of what was learned and why it matters"
 deciduous add action "Descriptive title of what was done"
 deciduous add outcome "What resulted from the action"
 deciduous add revisit "Reconsidering previous approach"
@@ -328,7 +328,7 @@ For post-hoc abandonment (tried something, it failed later):
 When a design approach is abandoned and replaced:
 
 ```bash
-deciduous add observation "JWT too large for mobile"
+deciduous add observation "JWT too large for mobile" -d "Mobile clients hit payload size limits with full JWT claims. Token refresh adds 2-3s on slow connections."
 deciduous add revisit "Reconsidering token strategy"
 deciduous link <observation> <revisit> -r "forced rethinking"
 deciduous status <old_decision> superseded
@@ -393,3 +393,7 @@ Sources:
 ## Output
 
 When done, run `deciduous graph > graph.json` to export.
+
+## Working Alongside Other Agents
+
+If other agents work on this at the same time (one narrative each, say), split the work and hand off on the deciduous message board, never in a scratch file: post with `deciduous board post --as <label> -s "..." -m "@other ..."` (or the `post_message` MCP tool), read `deciduous board read --unanswered <label>` before you start and before you finish, and answer with `--reply-to <id>`.

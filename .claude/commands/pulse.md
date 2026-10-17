@@ -1,3 +1,7 @@
+---
+description: Snapshot the project's current decision state — active goals, coverage gaps, orphan nodes — with no history.
+---
+
 # Pulse
 
 **Map the current model as decisions. No history, just now.**
@@ -26,7 +30,7 @@ Read the code. For the thing you're scoping, ask:
 
 Not implementation questions ("which library?") - model questions ("what's the behavior?")
 
-## Step 4: Build the goal → options → decisions
+## Step 4: Build the goal -> options -> decisions
 
 ```bash
 # Create the root goal
@@ -46,19 +50,12 @@ If a question is still open, leave it as option nodes without a decision.
 ## Step 5: Review
 
 ```bash
-# Check the pulse again to see what's mapped
 deciduous pulse
-
-# Check for coverage gaps
 deciduous pulse --summary
-
-# View visually
 deciduous serve
 ```
 
 ## Check for Supporting Documents
-
-If the system has architecture diagrams, specs, or reference docs relevant to the scope:
 
 ```bash
 deciduous doc list <goal_id>

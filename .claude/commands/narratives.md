@@ -1,3 +1,7 @@
+---
+description: Maintain .deciduous/narratives.md — the prose record of goals and turning points that /archaeology later compiles into graph nodes.
+---
+
 # Narrative Tracking
 
 **Narratives are the source of truth. Commits are just evidence.**
@@ -24,9 +28,10 @@ Edit `.deciduous/narratives.md`. For each section:
 2. Infer the **evolution** (how it likely got this way)
 3. Identify **PIVOTs** (when the conceptual model changed)
 4. Find evidence (PRs, commits, docs) - optional
-5. Check attached documents (`deciduous doc list`) - diagrams or specs may provide evidence
+5. Check attached documents (`deciduous doc list`)
 
 Signs of a pivot:
+
 - Two approaches coexisting (migration in progress)
 - Comments explaining "we used to do X"
 - Config for old + new system
@@ -44,19 +49,19 @@ deciduous narratives show
 deciduous narratives pivots
 ```
 
-This shows all revisit nodes already in the graph with their full chains.
-
 ## Output Format
 
 Each narrative section in `.deciduous/narratives.md`:
 
 ```markdown
 ## <Name>
+
 > <One sentence: what this piece of the system does>
 
 **Current state:** <How it works today>
 
 **Evolution:**
+
 1. <First approach> - <why>
 2. **PIVOT:** <what changed> - <why it changed>
 3. <Current approach> - <why this is better>
