@@ -1,7 +1,7 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { run } from './exec.ts';
-import { commit, createBranch, initRepository, stageFiles, untrackedFiles } from './git.ts';
+import { commit, createBranch, initRepository, stageFiles } from './git.ts';
 import {
 	applyToPackageJson,
 	applyToDemoPage,
@@ -13,9 +13,6 @@ import {
 import { downloadTemplate, listFiles } from './template.ts';
 
 export const KICKOFF_BRANCH = 'chore/suede-kickoff';
-
-/** Where `deciduous init` writes the Claude Code integration that belongs in the first commit. */
-const DECIDUOUS_OUTPUT_PATHS = ['.claude', 'CLAUDE.md'];
 
 export interface BootstrapStep {
 	title: string;
@@ -88,16 +85,9 @@ export function bootstrapSteps(
 			}
 		},
 		{
-			title: 'Initializing the decision graph',
-			run: async () => {
-				await run('deciduous', ['init'], projectDir);
-			}
-		},
-		{
 			title: 'Committing the bootstrap',
 			run: async () => {
-				const generated = await untrackedFiles(projectDir, DECIDUOUS_OUTPUT_PATHS);
-				await stageFiles(projectDir, [...new Set([...templateFiles, ...generated])]);
+				await stageFiles(projectDir, templateFiles);
 				await commit(
 					projectDir,
 					`chore: bootstrap from suede ${fields.suedeTag}\n\nsuede commit: ${suedeCommit}`
