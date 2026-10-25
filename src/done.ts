@@ -1,7 +1,7 @@
 import { realpathSync } from 'node:fs';
 import * as prompts from '@clack/prompts';
 import { run } from './exec.ts';
-import { findProjectRoot, NOT_A_PROJECT } from './project.ts';
+import { findGitRoot, NOT_A_GIT_REPO } from './project.ts';
 import { paint, tildify } from './style.ts';
 import {
 	hasOrigin,
@@ -15,10 +15,11 @@ import {
 export const DONE_USAGE = 'Removes worktrees whose branches are merged, then pulls main.';
 
 export async function runDone(): Promise<void> {
-	const projectRoot = findProjectRoot(process.cwd());
-	if (!projectRoot) throw new Error(NOT_A_PROJECT);
+	const gitRoot = findGitRoot(process.cwd());
+	if (!gitRoot) throw new Error(NOT_A_GIT_REPO);
 
-	const worktrees = await listWorktrees(projectRoot);
+	// Lists the main checkout first, whichever worktree gitRoot is.
+	const worktrees = await listWorktrees(gitRoot);
 	const [main] = worktrees;
 	if (!main) throw new Error('git worktree list returned nothing.');
 

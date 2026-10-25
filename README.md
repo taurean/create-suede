@@ -28,7 +28,7 @@ Then open Claude Code in the new directory and run `/suede-kickoff`.
 
 ## Working in a project
 
-Run these from the project's `main/` checkout or from any task worktree.
+Run these from the project's `main/` checkout or from any task worktree. `suede task` and `suede done` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release` still needs a suede project.
 
 ```bash
 suede task feat/login   # new worktree at ../feat-login on branch feat/login, off the latest main
@@ -37,7 +37,7 @@ suede release [level]   # commit the version bump on this branch (level: patch|m
 suede release --tag     # after the merge: tag main's merge commit with its version and push the tag
 ```
 
-`suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard.
+`suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard. It installs only with pnpm: when the main checkout has no `pnpm-lock.yaml` and no `packageManager` naming pnpm, it stops before creating anything.
 
 `suede done` fetches and prunes `origin`, then removes each task worktree whose branch has its own commits and is merged into `origin/main`, deleting the local branch with `git branch -d`. It keeps a worktree with uncommitted changes, the one you're standing in, and any branch that hasn't moved since it was created. Then it fast-forwards `main/` when it's on `main` and clean. Merges are detected by ancestry, so squash-merged branches aren't recognised.
 
