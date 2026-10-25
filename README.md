@@ -39,6 +39,8 @@ suede release --tag     # after the merge: tag main's merge commit with its vers
 
 `suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard.
 
+`suede done` needs only git, not `suede.from`: it runs in any git repository with task worktrees beside the main checkout, suede project or not. `suede task` and `suede release` still need a suede project. Outside a git repository, `done` stops with an error.
+
 `suede done` fetches and prunes `origin`, then removes each task worktree whose branch has its own commits and is merged into `origin/main`, deleting the local branch with `git branch -d`. It keeps a worktree with uncommitted changes, the one you're standing in, and any branch that hasn't moved since it was created. Then it fast-forwards `main/` when it's on `main` and clean. Merges are detected by ancestry, so squash-merged branches aren't recognised.
 
 `suede release` runs on the branch you're about to merge, with a clean tree. It reads the scheme from `suede.versioning` (or infers it from the version for older projects). Chronver uses today's date, adding `.N` when a tag or `main` already used it; semver asks for patch, minor or major unless you pass one. It rewrites only the version fields in `package.json` and `package-lock.json`, commits them as `chore(release): cut <version>`, and doesn't push. It refuses on `main` or when the branch's last commit is already a release commit.

@@ -23,3 +23,20 @@ export function findProjectRoot(start: string): string | undefined {
 
 export const NOT_A_PROJECT =
 	'Not inside a suede project: no package.json with "suede.from" above this directory.';
+
+/**
+ * Walks up from `start` to the nearest directory holding `.git`: a directory in
+ * the main checkout, a file in a task worktree. Reads no manifest, so it finds
+ * any git repository, suede project or not.
+ */
+export function findGitRoot(start: string): string | undefined {
+	let directory = start;
+	while (true) {
+		if (existsSync(join(directory, '.git'))) return directory;
+		const parent = dirname(directory);
+		if (parent === directory) return undefined;
+		directory = parent;
+	}
+}
+
+export const NOT_A_GIT_REPO = 'Not inside a git repository: no .git above this directory.';
