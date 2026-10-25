@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { findGitRoot, findProjectRoot } from './project.ts';
+import { findGitRoot, findProjectRoot, usesPnpm } from './project.ts';
 import { listWorktrees } from './worktree.ts';
 
 function git(cwd: string, ...args: string[]): void {
@@ -46,12 +46,48 @@ describe('root resolution in a plain git repo with sibling worktrees', () => {
 		expect((await listWorktrees(root!))[0]?.path).toBe(main);
 	});
 
-	it('keeps the suede.from gate shut for task and release', () => {
+	it('keeps the suede.from gate shut for release', () => {
 		expect(findProjectRoot(main)).toBeUndefined();
 		expect(findProjectRoot(task)).toBeUndefined();
 	});
 
 	it('finds nothing outside a git repository', () => {
 		expect(findGitRoot(container)).toBeUndefined();
+	});
+});
+
+describe('usesPnpm', () => {
+	let root: string;
+
+	beforeAll(() => {
+		root = mkdtempSync(join(tmpdir(), 'suede-pnpm-'));
+	});
+
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+	function checkout(name: string, files: Record<string, string>): string {
+		const directory = join(root, name);
+		mkdirSync(directory);
+		for (const [file, content] of Object.entries(files))
+			writeFileSync(join(directory, file), content);
+		return directory;
+	}
+
+	it('accepts a pnpm-lock.yaml', () => {
+		expect(usesPnpm(checkout('lock', { 'pnpm-lock.yaml': '', 'package.json': '{}' }))).toBe(true);
+	});
+
+	it('accepts a packageManager naming pnpm', () => {
+		const manifest = JSON.stringify({ packageManager: 'pnpm@10.6.0' });
+		expect(usesPnpm(checkout('field', { 'package.json': manifest }))).toBe(true);
+	});
+
+	it('refuses other package managers and repos without package.json', () => {
+		const npm = JSON.stringify({ packageManager: 'npm@10.0.0' });
+		expect(usesPnpm(checkout('npm', { 'package.json': npm, 'package-lock.json': '{}' }))).toBe(
+			false
+		);
+		expect(usesPnpm(checkout('bare', { 'package.json': '{}' }))).toBe(false);
+		expect(usesPnpm(checkout('none', {}))).toBe(false);
 	});
 });

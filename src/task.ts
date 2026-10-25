@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import * as prompts from '@clack/prompts';
 import { copyToClipboard } from './clipboard.ts';
 import { run } from './exec.ts';
-import { findProjectRoot, NOT_A_PROJECT } from './project.ts';
+import { findGitRoot, NOT_A_GIT_REPO, NOT_PNPM, usesPnpm } from './project.ts';
 import { paint, tildify } from './style.ts';
 import { hasOrigin, listWorktrees, siblingPath, validateTaskBranch } from './worktree.ts';
 
@@ -17,11 +17,13 @@ export async function runTask(branch: string | undefined): Promise<void> {
 	const branchError = validateTaskBranch(branch);
 	if (branchError || !branch) throw new Error(branchError);
 
-	const projectRoot = findProjectRoot(process.cwd());
-	if (!projectRoot) throw new Error(NOT_A_PROJECT);
+	const gitRoot = findGitRoot(process.cwd());
+	if (!gitRoot) throw new Error(NOT_A_GIT_REPO);
 
-	const [main] = await listWorktrees(projectRoot);
+	// Lists the main checkout first, whichever worktree gitRoot is.
+	const [main] = await listWorktrees(gitRoot);
 	if (!main) throw new Error('git worktree list returned nothing.');
+	if (!usesPnpm(main.path)) throw new Error(NOT_PNPM);
 	const worktreePath = siblingPath(main.path, branch);
 
 	if (existsSync(worktreePath)) throw new Error(`${tildify(worktreePath)} already exists.`);

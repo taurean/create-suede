@@ -40,3 +40,18 @@ export function findGitRoot(start: string): string | undefined {
 }
 
 export const NOT_A_GIT_REPO = 'Not inside a git repository: no .git above this directory.';
+
+/**
+ * True when the checkout at `root` installs with pnpm: it has a pnpm-lock.yaml,
+ * or package.json's `packageManager` names pnpm.
+ */
+export function usesPnpm(root: string): boolean {
+	if (existsSync(join(root, 'pnpm-lock.yaml'))) return true;
+	const manifestPath = join(root, 'package.json');
+	if (!existsSync(manifestPath)) return false;
+	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { packageManager?: unknown };
+	return typeof manifest.packageManager === 'string' && /^pnpm(@|$)/.test(manifest.packageManager);
+}
+
+export const NOT_PNPM =
+	'suede task installs with pnpm, but the main checkout has no pnpm-lock.yaml and no "packageManager" naming pnpm in package.json.';
