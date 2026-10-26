@@ -1,20 +1,29 @@
 import { readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { downloadTemplate as gigetDownload } from 'giget';
-import { latestChronverTag } from './chronver.ts';
+import { chronverTags, type ChronverTag } from './chronver.ts';
 import { run } from './exec.ts';
 
 export const TEMPLATE_REPO = 'taurean/suede';
 
-export async function resolveLatestTag(): Promise<{ tag: string; commit: string }> {
+/** Every chronver tag on suede, oldest first, read with `git ls-remote` (no clone). */
+export async function fetchTemplateTags(): Promise<ChronverTag[]> {
 	const output = await run('git', [
 		'ls-remote',
 		'--tags',
 		`https://github.com/${TEMPLATE_REPO}.git`
 	]);
-	const latest = latestChronverTag(output);
+	return chronverTags(output);
+}
+
+export function latestTemplateTag(tags: ChronverTag[]): ChronverTag {
+	const latest = tags.at(-1);
 	if (!latest) throw new Error(`No chronver tag found on ${TEMPLATE_REPO}.`);
 	return latest;
+}
+
+export async function resolveLatestTag(): Promise<{ tag: string; commit: string }> {
+	return latestTemplateTag(await fetchTemplateTags());
 }
 
 /** Extracts the tag's tarball: tracked files only, no .git history. */

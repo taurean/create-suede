@@ -33,10 +33,14 @@ export function todayChronver(date = new Date()): string {
 	return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()}`;
 }
 
-/** Picks the newest chronver tag from `git ls-remote --tags` output. */
-export function latestChronverTag(
-	lsRemoteOutput: string
-): { tag: string; commit: string } | undefined {
+export interface ChronverTag {
+	tag: string;
+	commit: string;
+	version: Chronver;
+}
+
+/** Every chronver tag in `git ls-remote --tags` output, oldest first. */
+export function chronverTags(lsRemoteOutput: string): ChronverTag[] {
 	const tags = new Map<string, { commit: string; peeled: boolean }>();
 
 	for (const line of lsRemoteOutput.split('\n')) {
@@ -48,14 +52,12 @@ export function latestChronverTag(
 		if (peeled || !tags.has(tag)) tags.set(tag, { commit: hash, peeled });
 	}
 
-	let latest: { tag: string; commit: string; version: Chronver } | undefined;
+	const parsed: ChronverTag[] = [];
 	for (const [tag, { commit }] of tags) {
 		const version = parseChronver(tag);
-		if (version && (!latest || compareChronver(version, latest.version) > 0)) {
-			latest = { tag, commit, version };
-		}
+		if (version) parsed.push({ tag, commit, version });
 	}
-	return latest && { tag: latest.tag, commit: latest.commit };
+	return parsed.sort((a, b) => compareChronver(a.version, b.version));
 }
 
 /**
