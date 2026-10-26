@@ -5,6 +5,7 @@ import { DONE_USAGE, runDone } from '../done.ts';
 import { NEW_USAGE, runNew } from '../new.ts';
 import { RELEASE_USAGE, runRelease, runReleaseTag } from '../release.ts';
 import { runTask, TASK_USAGE } from '../task.ts';
+import { runVersion } from '../version.ts';
 
 const USAGE = `Usage: suede <command>
 
@@ -15,9 +16,13 @@ Commands:
   release [level] [--tag] ${RELEASE_USAGE}
 
 Options:
-  -h, --help   Show this message`;
+  -h, --help      Show this message
+  -v, --version   Show this CLI's version and the latest create-suede and suede`;
 
-const args = parse(process.argv.slice(2), { boolean: ['help', 'tag'], alias: { h: 'help' } });
+const args = parse(process.argv.slice(2), {
+	boolean: ['help', 'tag', 'version'],
+	alias: { h: 'help', v: 'version' }
+});
 
 const COMMANDS: Record<string, (rest: string[]) => Promise<void>> = {
 	new: (rest) => runNew(rest[0]),
@@ -34,7 +39,11 @@ function fail(error: unknown): never {
 	process.exit(1);
 }
 
-if (args.help || command === undefined) {
+if (args.help) {
+	console.log(USAGE);
+} else if (args.version) {
+	runVersion().catch(fail);
+} else if (command === undefined) {
 	console.log(USAGE);
 } else if (!handler) {
 	console.error(`Unknown command: ${command}\n\n${USAGE}`);

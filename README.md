@@ -26,6 +26,16 @@ Then open Claude Code in the new directory and run `/suede-kickoff`.
 
 `~/Developer/<name>/` is a container: `main/` is the primary checkout, and task worktrees go beside it (`git worktree add ../<type>-<slug> -b <type>/<slug> origin/main`).
 
+## Checking the version
+
+```bash
+suede --version          # or -v; create-suede --version prints the same
+```
+
+Prints this CLI's version, the latest `create-suede` on npm, and the latest suede tag (resolved the same way `suede new` resolves it). When the installed CLI is behind npm, it names the upgrade command for how it was installed: `volta install`, `pnpm add -g`, or `npm install -g`. Inside a suede project it adds the project's `suede.from`; `suede status` reports the drift. If npm or GitHub can't be reached, that line says so and the rest still prints, exiting 0.
+
+`~/Developer/<name>/` is a container: `main/` is the primary checkout, and task worktrees go beside it (`git worktree add ../<type>-<slug> -b <type>/<slug> origin/main`).
+
 ## Working in a project
 
 Run these from the project's `main/` checkout or from any task worktree. `suede task` and `suede done` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release` still needs a suede project.

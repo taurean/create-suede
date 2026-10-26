@@ -32,3 +32,15 @@ export function bumpSemver(version: string, level: SemverLevel): string {
 	if (level === 'minor') return `${major}.${minor + 1}.0`;
 	return `${major}.${minor}.${patch + 1}`;
 }
+
+/** Orders two plain semver versions; undefined when either isn't plain semver. */
+export function compareSemver(a: string, b: string): number | undefined {
+	const parse = (version: string) => SEMVER_PATTERN.exec(version)?.slice(1).map(Number);
+	const [left, right] = [parse(a), parse(b)];
+	if (!left || !right) return undefined;
+	for (let index = 0; index < 3; index++) {
+		const difference = (left[index] ?? 0) - (right[index] ?? 0);
+		if (difference !== 0) return difference;
+	}
+	return 0;
+}
