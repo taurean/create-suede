@@ -24,8 +24,6 @@ The name argument is optional; without it, the CLI asks. It asks every question 
 
 Then open Claude Code in the new directory and run `/suede-kickoff`.
 
-`~/Developer/<name>/` is a container: `main/` is the primary checkout, and task worktrees go beside it (`git worktree add ../<type>-<slug> -b <type>/<slug> origin/main`).
-
 ## Checking the version
 
 ```bash
@@ -38,13 +36,14 @@ Prints this CLI's version, the latest `create-suede` on npm, and the latest sued
 
 ## Working in a project
 
-Run these from the project's `main/` checkout or from any task worktree. `suede task` and `suede done` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release` still needs a suede project.
+Run these from the project's `main/` checkout or from any task worktree. `suede task` and `suede done` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release` and `suede status` still need a suede project.
 
 ```bash
 suede task feat/login   # new worktree at ../feat-login on branch feat/login, off the latest main
 suede done              # remove worktrees whose branches are merged, then fast-forward main
 suede release [level]   # commit the version bump on this branch (level: patch|minor|major, semver only)
 suede release --tag     # after the merge: tag main's merge commit with its version and push the tag
+suede status            # how far suede.from is behind the latest suede tag, with the changelog
 ```
 
 `suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard. It installs only with pnpm: when the main checkout has no `pnpm-lock.yaml` and no `packageManager` naming pnpm, it stops before creating anything.
@@ -54,6 +53,8 @@ suede release --tag     # after the merge: tag main's merge commit with its vers
 `suede release` runs on the branch you're about to merge, with a clean tree. It reads the scheme from `suede.versioning` (or infers it from the version for older projects). Chronver uses today's date, adding `.N` when a tag or `main` already used it; semver asks for patch, minor or major unless you pass one. It rewrites only the version fields in `package.json` and `package-lock.json`, commits them as `chore(release): cut <version>`, and doesn't push. It refuses on `main` or when the branch's last commit is already a release commit.
 
 `suede release --tag` fetches `origin`, reads the version from `origin/main`'s `package.json`, creates an annotated tag on that commit, and pushes only the tag. It refuses when the tag already exists.
+
+`suede status` reads suede's tags with `git ls-remote` and reports how far `suede.from` is behind the latest one, two ways: releases behind (every newer tag, each `.N` cut counting as one) and days behind (the gap between the two tags' dates). When it's behind, it prints the changelog, `git log <suede.from>..<latest>`, read from a treeless clone of suede (commits only) in a temporary directory that it removes afterwards. It changes nothing in the project. It stops with an error when `suede.from` isn't a chronver tag that exists on suede.
 
 ## Development
 

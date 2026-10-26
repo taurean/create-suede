@@ -79,3 +79,16 @@ export function nextChronver(today: string, taken: string[]): string {
 	if (sameDay.length === 0) return today;
 	return `${today}.${Math.max(...sameDay.map((version) => version.changeset)) + 1}`;
 }
+
+/** How many of `tags` are newer than `from`. Each `.N` counts as its own release. */
+export function releasesBehind(from: Chronver, tags: ChronverTag[]): number {
+	return tags.filter((tag) => compareChronver(tag.version, from) > 0).length;
+}
+
+/** Whole days from `from`'s date to `to`'s date; `.N` changesets don't count. */
+export function daysBetween(from: Chronver, to: Chronver): number {
+	const millisecondsPerDay = 24 * 60 * 60 * 1000;
+	const start = Date.UTC(from.year, from.month - 1, from.day);
+	const end = Date.UTC(to.year, to.month - 1, to.day);
+	return Math.round((end - start) / millisecondsPerDay);
+}

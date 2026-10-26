@@ -1,4 +1,5 @@
-import { readdir } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { downloadTemplate as gigetDownload } from 'giget';
 import { chronverTags, type ChronverTag } from './chronver.ts';
@@ -24,6 +25,28 @@ export function latestTemplateTag(tags: ChronverTag[]): ChronverTag {
 
 export async function resolveLatestTag(): Promise<{ tag: string; commit: string }> {
 	return latestTemplateTag(await fetchTemplateTags());
+}
+
+/**
+ * `git log <from>..<to>` on suede, suede's changelog format. Reads a treeless bare
+ * clone (commits only, no file contents) in a temporary directory, removed after.
+ */
+export async function templateChangelog(from: string, to: string): Promise<string[]> {
+	const directory = await mkdtemp(join(tmpdir(), 'suede-changelog-'));
+	try {
+		await run('git', [
+			'clone',
+			'--quiet',
+			'--bare',
+			'--filter=tree:0',
+			`https://github.com/${TEMPLATE_REPO}.git`,
+			directory
+		]);
+		const log = await run('git', ['log', '--format=%h %s', `${from}..${to}`], directory);
+		return log.split('\n').filter(Boolean);
+	} finally {
+		await rm(directory, { recursive: true, force: true });
+	}
 }
 
 /** Extracts the tag's tarball: tracked files only, no .git history. */

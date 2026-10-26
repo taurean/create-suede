@@ -4,6 +4,7 @@ import * as prompts from '@clack/prompts';
 import { DONE_USAGE, runDone } from '../done.ts';
 import { NEW_USAGE, runNew } from '../new.ts';
 import { RELEASE_USAGE, runRelease, runReleaseTag } from '../release.ts';
+import { runStatus, STATUS_USAGE } from '../status.ts';
 import { runTask, TASK_USAGE } from '../task.ts';
 import { runVersion } from '../version.ts';
 
@@ -14,6 +15,7 @@ Commands:
   task <type>/<slug>      ${TASK_USAGE}
   done                    ${DONE_USAGE}
   release [level] [--tag] ${RELEASE_USAGE}
+  status                  ${STATUS_USAGE}
 
 Options:
   -h, --help      Show this message
@@ -28,7 +30,8 @@ const COMMANDS: Record<string, (rest: string[]) => Promise<void>> = {
 	new: (rest) => runNew(rest[0]),
 	task: (rest) => runTask(rest[0]),
 	done: () => runDone(),
-	release: (rest) => (args.tag ? runReleaseTag() : runRelease(rest[0]))
+	release: (rest) => (args.tag ? runReleaseTag() : runRelease(rest[0])),
+	status: () => runStatus()
 };
 
 const [command, ...rest] = args._.map(String);
