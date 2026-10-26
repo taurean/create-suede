@@ -9,7 +9,8 @@ import {
 	isDirty,
 	listWorktrees,
 	mergedBranches,
-	planRemovals
+	planRemovals,
+	removeWorktrees
 } from './worktree.ts';
 
 export const DONE_USAGE = 'Removes worktrees whose branches are merged, then pulls main.';
@@ -41,11 +42,9 @@ export async function runDone(): Promise<void> {
 	}
 	const plan = planRemovals(worktrees, merged, dirty, realpathSync(process.cwd()));
 
-	for (const worktree of plan.remove) {
-		spinner.message(`Removing ${worktree.branch}`);
-		await run('git', ['worktree', 'remove', worktree.path], main.path);
-		await run('git', ['branch', '-d', worktree.branch ?? ''], main.path);
-	}
+	const { removed, failed } = await removeWorktrees(main.path, plan.remove, (worktree) =>
+		spinner.message(`Removing ${worktree.branch}`)
+	);
 
 	let pullNote = '';
 	if (remote) {
@@ -60,13 +59,13 @@ export async function runDone(): Promise<void> {
 		}
 	}
 
-	const count = plan.remove.length;
+	const count = removed.length;
 	spinner.stop(
-		count === 0
+		plan.remove.length === 0
 			? 'No merged worktrees to remove'
 			: `Removed ${count} merged worktree${count === 1 ? '' : 's'}`
 	);
-	for (const worktree of plan.remove) {
+	for (const worktree of removed) {
 		prompts.log.message(
 			`${paint('dim', '−')} ${worktree.branch} ${paint('dim', tildify(worktree.path))}`
 		);
@@ -74,5 +73,9 @@ export async function runDone(): Promise<void> {
 	for (const { worktree, reason } of plan.skipped) {
 		prompts.log.warn(`Kept ${worktree.branch}: ${reason}.`);
 	}
+	for (const { worktree, error } of failed) {
+		prompts.log.error(`Couldn't remove ${worktree.branch}: ${error}`);
+	}
 	if (pullNote) prompts.log.warn(pullNote);
+	if (failed.length > 0) process.exitCode = 1;
 }
