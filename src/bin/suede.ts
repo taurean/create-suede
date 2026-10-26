@@ -29,14 +29,16 @@ const COMMANDS: Record<string, (rest: string[]) => Promise<void>> = {
 const [command, ...rest] = args._.map(String);
 const handler = command === undefined ? undefined : COMMANDS[command];
 
+function fail(error: unknown): never {
+	prompts.log.error(error instanceof Error ? error.message : String(error));
+	process.exit(1);
+}
+
 if (args.help || command === undefined) {
 	console.log(USAGE);
 } else if (!handler) {
 	console.error(`Unknown command: ${command}\n\n${USAGE}`);
 	process.exit(1);
 } else {
-	handler(rest).catch((error: unknown) => {
-		prompts.log.error(error instanceof Error ? error.message : String(error));
-		process.exit(1);
-	});
+	handler(rest).catch(fail);
 }

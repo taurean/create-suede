@@ -12,11 +12,13 @@ Options:
 
 const args = parse(process.argv.slice(2), { boolean: ['help'], alias: { h: 'help' } });
 
+function fail(error: unknown): never {
+	prompts.log.error(error instanceof Error ? error.message : String(error));
+	process.exit(1);
+}
+
 if (args.help) {
 	console.log(USAGE);
 } else {
-	runNew(args._[0] === undefined ? undefined : String(args._[0])).catch((error: unknown) => {
-		prompts.log.error(error instanceof Error ? error.message : String(error));
-		process.exit(1);
-	});
+	runNew(args._[0] === undefined ? undefined : String(args._[0])).catch(fail);
 }
