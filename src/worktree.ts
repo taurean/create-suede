@@ -97,6 +97,42 @@ export async function hasOwnCommits(cwd: string, branch: string): Promise<boolea
 	return entries.length === 0 || tip !== creationPoint;
 }
 
+export interface RemovalResult {
+	removed: Worktree[];
+	failed: { worktree: Worktree; error: string }[];
+}
+
+/**
+ * Removes each worktree and deletes its branch, continuing past a failure so one
+ * bad worktree doesn't strand the rest.
+ *
+ * Deletes with `-D`: the caller's merged check against the base is the safety
+ * check. `-d` would re-check against the branch's upstream, or against `HEAD` of
+ * `mainPath` when there is none, and refuse a branch merged into the base but not
+ * into a stale upstream or an unpulled main.
+ */
+export async function removeWorktrees(
+	mainPath: string,
+	worktrees: Worktree[],
+	onRemoving?: (worktree: Worktree) => void
+): Promise<RemovalResult> {
+	const result: RemovalResult = { removed: [], failed: [] };
+	for (const worktree of worktrees) {
+		onRemoving?.(worktree);
+		try {
+			await run('git', ['worktree', 'remove', worktree.path], mainPath);
+			await run('git', ['branch', '-D', worktree.branch ?? ''], mainPath);
+			result.removed.push(worktree);
+		} catch (error) {
+			result.failed.push({
+				worktree,
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
+	}
+	return result;
+}
+
 export async function isDirty(path: string): Promise<boolean> {
 	return (await run('git', ['status', '--porcelain'], path)).trim() !== '';
 }
