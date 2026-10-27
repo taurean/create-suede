@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { latestChronverTag, nextChronver, parseChronver, todayChronver } from './chronver.ts';
+import { chronverTags, nextChronver, parseChronver, todayChronver } from './chronver.ts';
 
 describe('parseChronver', () => {
 	it('accepts day, changeset, and label forms', () => {
@@ -26,8 +26,8 @@ describe('todayChronver', () => {
 	});
 });
 
-describe('latestChronverTag', () => {
-	it('picks the newest tag by date and changeset, using the peeled commit', () => {
+describe('chronverTags', () => {
+	it('orders tags by date and changeset, using the peeled commit', () => {
 		const output = [
 			'aaa\trefs/tags/2026.7.3.2',
 			'bbb\trefs/tags/2026.7.3.2^{}',
@@ -36,11 +36,15 @@ describe('latestChronverTag', () => {
 			'eee\trefs/tags/2026.6.30',
 			'fff\trefs/tags/not-a-version'
 		].join('\n');
-		expect(latestChronverTag(output)).toEqual({ tag: '2026.7.3.10', commit: 'ddd' });
+		expect(chronverTags(output).map(({ tag, commit }) => ({ tag, commit }))).toEqual([
+			{ tag: '2026.6.30', commit: 'eee' },
+			{ tag: '2026.7.3.2', commit: 'bbb' },
+			{ tag: '2026.7.3.10', commit: 'ddd' }
+		]);
 	});
 
-	it('returns undefined when no tag is chronver', () => {
-		expect(latestChronverTag('aaa\trefs/tags/v1.0.0\n')).toBeUndefined();
+	it('returns nothing when no tag is chronver', () => {
+		expect(chronverTags('aaa\trefs/tags/v1.0.0\n')).toEqual([]);
 	});
 });
 

@@ -33,10 +33,14 @@ export function todayChronver(date = new Date()): string {
 	return `${date.getFullYear()}.${date.getMonth() + 1}.${date.getDate()}`;
 }
 
-/** Picks the newest chronver tag from `git ls-remote --tags` output. */
-export function latestChronverTag(
-	lsRemoteOutput: string
-): { tag: string; commit: string } | undefined {
+export interface ChronverTag {
+	tag: string;
+	commit: string;
+	version: Chronver;
+}
+
+/** Every chronver tag in `git ls-remote --tags` output, oldest first. */
+export function chronverTags(lsRemoteOutput: string): ChronverTag[] {
 	const tags = new Map<string, { commit: string; peeled: boolean }>();
 
 	for (const line of lsRemoteOutput.split('\n')) {
@@ -48,14 +52,12 @@ export function latestChronverTag(
 		if (peeled || !tags.has(tag)) tags.set(tag, { commit: hash, peeled });
 	}
 
-	let latest: { tag: string; commit: string; version: Chronver } | undefined;
+	const parsed: ChronverTag[] = [];
 	for (const [tag, { commit }] of tags) {
 		const version = parseChronver(tag);
-		if (version && (!latest || compareChronver(version, latest.version) > 0)) {
-			latest = { tag, commit, version };
-		}
+		if (version) parsed.push({ tag, commit, version });
 	}
-	return latest && { tag: latest.tag, commit: latest.commit };
+	return parsed.sort((a, b) => compareChronver(a.version, b.version));
 }
 
 /**
@@ -76,4 +78,17 @@ export function nextChronver(today: string, taken: string[]): string {
 		);
 	if (sameDay.length === 0) return today;
 	return `${today}.${Math.max(...sameDay.map((version) => version.changeset)) + 1}`;
+}
+
+/** How many of `tags` are newer than `from`. Each `.N` counts as its own release. */
+export function releasesBehind(from: Chronver, tags: ChronverTag[]): number {
+	return tags.filter((tag) => compareChronver(tag.version, from) > 0).length;
+}
+
+/** Whole days from `from`'s date to `to`'s date; `.N` changesets don't count. */
+export function daysBetween(from: Chronver, to: Chronver): number {
+	const millisecondsPerDay = 24 * 60 * 60 * 1000;
+	const start = Date.UTC(from.year, from.month - 1, from.day);
+	const end = Date.UTC(to.year, to.month - 1, to.day);
+	return Math.round((end - start) / millisecondsPerDay);
 }
