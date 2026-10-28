@@ -47,7 +47,9 @@ suede status            # each task worktree: uncommitted, merged and ready for 
 suede update            # merge the latest suede's skills and agents into a new worktree, uncommitted
 ```
 
-`suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard. It installs only with pnpm: when the main checkout has no `pnpm-lock.yaml` and no `packageManager` naming pnpm, it stops before creating anything.
+`suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), symlinks the main checkout's env files into the new worktree, runs `pnpm install` there, and copies its `cd` command to your clipboard. It installs only with pnpm: when the main checkout has no `pnpm-lock.yaml` and no `packageManager` naming pnpm, it stops before creating anything.
+
+The env files are the root-level `.env`, `.env.*` and `.dev.vars` files in the main checkout that git ignores and doesn't track; suede's `.gitignore` keeps `.env.example` and `.env.test` out of that. Each link is relative (`../main/.env`), so a secret rotated in `main/` reaches every worktree, and editing one in a worktree edits it in `main/`. Nothing git doesn't ignore is linked, so a link can't be committed by accident, and `suede done` removes the links with the worktree.
 
 `suede done` fetches and prunes `origin`, then removes each task worktree whose branch has its own commits and is merged into `origin/main`, deleting the local branch with `git branch -D`, since the merged check against `origin/main` is what decides, not the branch's upstream. If one removal fails, it reports the error, carries on with the rest, and exits non-zero. It keeps a worktree with uncommitted changes, the one you're standing in, and any branch that hasn't moved since it was created. Then it fast-forwards `main/` when it's on `main` and clean. Merges are detected by ancestry, so squash-merged branches aren't recognised.
 
