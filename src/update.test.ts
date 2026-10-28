@@ -53,6 +53,30 @@ describe('applyUpdate', () => {
 
 	afterEach(() => rmSync(container, { recursive: true, force: true }));
 
+	it('fails loudly when git merge-file cannot merge a file, instead of calling it a conflict', async () => {
+		const image = '.claude/skills/task/diagram.bin';
+		write(base, image, 'a\0base');
+		write(project, image, 'a\0project');
+		write(theirs, image, 'a\0suede');
+
+		await expect(applyUpdate({ base, theirs, project })).rejects.toThrow(
+			/git merge-file failed on .*diagram\.bin[\s\S]*Cannot merge binary files/
+		);
+	});
+
+	it('lists nothing as left out when the project and suede both removed a skill or agent', async () => {
+		write(base, '.claude/skills/retired/SKILL.md', lines());
+		write(base, '.claude/agents/retired.md', lines());
+		write(base, SKILL, lines());
+		write(theirs, SKILL, lines());
+		write(project, SKILL, lines());
+
+		const report = await applyUpdate({ base, theirs, project });
+
+		expect(report.leftOut).toEqual([]);
+		expect(report.removed).toEqual([]);
+	});
+
 	it("keeps the project's edits and carries suede's into skill and agent files", async () => {
 		for (const path of [SKILL, AGENT]) {
 			write(base, path, lines());

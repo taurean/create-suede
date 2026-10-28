@@ -61,8 +61,9 @@ async function readIfExists(path: string): Promise<Buffer | undefined> {
 }
 
 /**
- * `git merge-file` on `current` in place. Exits with the number of conflicts, so
- * a positive exit code is a result, not a failure; a negative one is an error.
+ * `git merge-file` on `current` in place. Exits with the number of conflicts,
+ * capped at 127, so 1–127 is a result, not a failure. An error, such as a binary
+ * file it can't merge, exits 255.
  */
 async function mergeFile(current: string, base: string, other: string): Promise<boolean> {
 	const labels = ['-L', 'project', '-L', 'suede.from', '-L', 'latest suede'];
@@ -71,7 +72,7 @@ async function mergeFile(current: string, base: string, other: string): Promise<
 		return false;
 	} catch (error) {
 		const code = (error as { code?: unknown }).code;
-		if (typeof code === 'number' && code > 0) return true;
+		if (typeof code === 'number' && code > 0 && code < 128) return true;
 		const stderr = (error as { stderr?: string }).stderr?.trim();
 		throw new Error(`git merge-file failed on ${current}${stderr ? `:\n${stderr}` : '.'}`, {
 			cause: error
@@ -158,7 +159,9 @@ export async function applyUpdate(directories: UpdateDirectories): Promise<Updat
 
 			const unit = deletionUnit(path);
 			if (removedUnits.has(unit)) {
-				if (changedUpstream && !report.leftOut.includes(unit)) report.leftOut.push(unit);
+				// Listed only when suede still has it and changed it; both removing it agrees.
+				const changedInSuede = theirs && (!base || !base.equals(theirs));
+				if (changedInSuede && !report.leftOut.includes(unit)) report.leftOut.push(unit);
 				continue;
 			}
 			if (!changedUpstream) continue;
