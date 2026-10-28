@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import * as prompts from '@clack/prompts';
 import { copyToClipboard } from './clipboard.ts';
 import { run } from './exec.ts';
+import { bumpSuedeCss, type SuedeCssBump } from './manifest.ts';
 import { findProjectRoot, NOT_A_PROJECT } from './project.ts';
 import { measureDrift, type Drift } from './status.ts';
 import { paint, tildify } from './style.ts';
@@ -264,6 +265,7 @@ export async function runUpdate(): Promise<void> {
 	const downloads = await mkdtemp(join(tmpdir(), 'suede-update-'));
 	let report: UpdateReport;
 	let changelog: string[];
+	let suedeCss: SuedeCssBump | undefined;
 	try {
 		const base = join(downloads, 'base');
 		const theirs = join(downloads, 'theirs');
@@ -282,8 +284,13 @@ export async function runUpdate(): Promise<void> {
 		spinner.message('Merging');
 		report = await applyUpdate({ base, theirs, project: worktreePath });
 		const manifestPath = join(worktreePath, 'package.json');
-		const manifest = await readFile(manifestPath, 'utf8');
-		await writeFile(manifestPath, replaceSuedeFrom(manifest, from, drift.latest));
+		const manifest = replaceSuedeFrom(await readFile(manifestPath, 'utf8'), from, drift.latest);
+		suedeCss = bumpSuedeCss(manifest, await readFile(join(theirs, 'package.json'), 'utf8'));
+		await writeFile(manifestPath, suedeCss?.source ?? manifest);
+		if (suedeCss) {
+			spinner.message(`Installing @taurean/suede-css ${suedeCss.to}`);
+			await run('pnpm', ['install'], worktreePath);
+		}
 
 		spinner.message('Reading the changelog');
 		changelog = await templateChangelog(from, drift.latest);
@@ -306,6 +313,11 @@ export async function runUpdate(): Promise<void> {
 	list('Added', report.added);
 	list('Removed', report.removed);
 	list('Removed here, changed in suede: left out', report.leftOut);
+	if (suedeCss) {
+		prompts.log.message(
+			`${paint('yellow', '@taurean/suede-css')} ${suedeCss.from} → ${suedeCss.to}: check the project's CSS`
+		);
+	}
 	prompts.log.message(changelog.join('\n'));
 
 	const cdCommand = `cd ${tildify(worktreePath)}`;
