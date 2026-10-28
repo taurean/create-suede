@@ -2,7 +2,13 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { downloadTemplate as gigetDownload } from 'giget';
-import { chronverTags, type ChronverTag } from './chronver.ts';
+import {
+	chronverTags,
+	daysBetween,
+	parseChronver,
+	releasesBehind,
+	type ChronverTag
+} from './chronver.ts';
 import { run } from './exec.ts';
 
 export const TEMPLATE_REPO = 'taurean/suede';
@@ -21,6 +27,27 @@ export function latestTemplateTag(tags: ChronverTag[]): ChronverTag {
 	const latest = tags.at(-1);
 	if (!latest) throw new Error(`No chronver tag found on ${TEMPLATE_REPO}.`);
 	return latest;
+}
+
+export interface Drift {
+	latest: string;
+	releases: number;
+	days: number;
+}
+
+/** How far `from` is behind the newest of suede's `tags`. `from` must be one of them. */
+export function measureDrift(from: string, tags: ChronverTag[]): Drift {
+	const fromVersion = parseChronver(from);
+	if (!fromVersion) throw new Error(`suede.from "${from}" isn't a chronver tag.`);
+	if (!tags.some((tag) => tag.tag === from)) {
+		throw new Error(`suede.from ${from} isn't a tag on ${TEMPLATE_REPO}.`);
+	}
+	const latest = latestTemplateTag(tags);
+	return {
+		latest: latest.tag,
+		releases: releasesBehind(fromVersion, tags),
+		days: daysBetween(fromVersion, latest.version)
+	};
 }
 
 export async function resolveLatestTag(): Promise<{ tag: string; commit: string }> {

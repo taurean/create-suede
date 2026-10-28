@@ -9,12 +9,13 @@ import { copyToClipboard } from './clipboard.ts';
 import { run } from './exec.ts';
 import { bumpSuedeCss, type SuedeCssBump } from './manifest.ts';
 import { findProjectRoot, NOT_A_PROJECT } from './project.ts';
-import { measureDrift, type Drift } from './status.ts';
 import { paint, tildify } from './style.ts';
 import {
+	type Drift,
 	downloadTemplate,
 	fetchTemplateTags,
 	listFiles,
+	measureDrift,
 	TEMPLATE_REPO,
 	templateChangelog
 } from './template.ts';

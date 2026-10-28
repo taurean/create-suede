@@ -1,38 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as prompts from '@clack/prompts';
-import { daysBetween, parseChronver, releasesBehind, type ChronverTag } from './chronver.ts';
 import { findProjectRoot, NOT_A_PROJECT } from './project.ts';
 import { paint } from './style.ts';
 import {
+	type Drift,
 	fetchTemplateTags,
-	latestTemplateTag,
+	measureDrift,
 	TEMPLATE_REPO,
 	templateChangelog
 } from './template.ts';
 
 export const STATUS_USAGE = 'Shows how far this project is behind the latest suede.';
-
-export interface Drift {
-	latest: string;
-	releases: number;
-	days: number;
-}
-
-/** How far `from` is behind the newest of suede's `tags`. `from` must be one of them. */
-export function measureDrift(from: string, tags: ChronverTag[]): Drift {
-	const fromVersion = parseChronver(from);
-	if (!fromVersion) throw new Error(`suede.from "${from}" isn't a chronver tag.`);
-	if (!tags.some((tag) => tag.tag === from)) {
-		throw new Error(`suede.from ${from} isn't a tag on ${TEMPLATE_REPO}.`);
-	}
-	const latest = latestTemplateTag(tags);
-	return {
-		latest: latest.tag,
-		releases: releasesBehind(fromVersion, tags),
-		days: daysBetween(fromVersion, latest.version)
-	};
-}
 
 function plural(count: number, noun: string): string {
 	return `${count} ${noun}${count === 1 ? '' : 's'}`;

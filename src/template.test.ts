@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { chronverTags } from './chronver.ts';
-import { measureDrift } from './status.ts';
+import { measureDrift } from './template.ts';
 
 const tags = chronverTags(
 	['2026.9.30.1', '2026.10.17', '2026.10.21', '2026.10.21.1', '2026.10.26']
