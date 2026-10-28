@@ -286,6 +286,7 @@ export async function runUpdate(): Promise<void> {
 	let report: UpdateReport;
 	let changelog: string[];
 	let suedeCss: SuedeCssBump | undefined;
+	let created = false;
 	try {
 		const base = join(downloads, 'base');
 		const theirs = join(downloads, 'theirs');
@@ -300,6 +301,7 @@ export async function runUpdate(): Promise<void> {
 		}
 		spinner.message(`Creating ${branch}`);
 		await run('git', ['worktree', 'add', '--quiet', worktreePath, '-b', branch, start], main.path);
+		created = true;
 
 		spinner.message('Merging');
 		report = await applyUpdate({ base, theirs, project: worktreePath });
@@ -315,7 +317,11 @@ export async function runUpdate(): Promise<void> {
 		spinner.message('Reading the changelog');
 		changelog = await templateChangelog(from, drift.latest);
 	} catch (error) {
-		spinner.error('Could not update from suede');
+		spinner.error(
+			created
+				? `Could not finish the update. ${tildify(worktreePath)} and branch ${branch} are left as they are; remove both before running it again.`
+				: 'Could not update from suede'
+		);
 		throw error;
 	} finally {
 		await rm(downloads, { recursive: true, force: true });
