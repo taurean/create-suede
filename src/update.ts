@@ -11,7 +11,13 @@ import { bumpSuedeCss, type SuedeCssBump } from './manifest.ts';
 import { findProjectRoot, NOT_A_PROJECT } from './project.ts';
 import { measureDrift, type Drift } from './status.ts';
 import { paint, tildify } from './style.ts';
-import { downloadTemplate, fetchTemplateTags, listFiles, templateChangelog } from './template.ts';
+import {
+	downloadTemplate,
+	fetchTemplateTags,
+	listFiles,
+	TEMPLATE_REPO,
+	templateChangelog
+} from './template.ts';
 import { branchExists, hasOrigin, listWorktrees, siblingPath } from './worktree.ts';
 
 export const UPDATE_USAGE = "Merges the latest suede's skills and agents into a new worktree.";
@@ -46,6 +52,8 @@ export interface UpdateReport {
 	keptOverRemoval: string[];
 	/** Skill directories, agents, or components the project deleted and suede changed since, left out. */
 	leftOut: string[];
+	/** suede's CLAUDE.md changed. The project's is never touched; it's ported by hand. */
+	claudeMdChanged: boolean;
 }
 
 async function readIfExists(path: string): Promise<Buffer | undefined> {
@@ -99,6 +107,14 @@ function inUnit(path: string, unit: string): boolean {
 	return unit.endsWith('/') ? path.startsWith(unit) : path === unit;
 }
 
+async function claudeMdChanged(directories: UpdateDirectories): Promise<boolean> {
+	const [base, theirs] = await Promise.all([
+		readIfExists(join(directories.base, 'CLAUDE.md')),
+		readIfExists(join(directories.theirs, 'CLAUDE.md'))
+	]);
+	return !base || !theirs ? base !== theirs : !base.equals(theirs);
+}
+
 /**
  * Writes suede's changes between `base` and `theirs` into `project`'s process
  * layer, three ways, adds suede's new components, and reports what it did.
@@ -111,7 +127,8 @@ export async function applyUpdate(directories: UpdateDirectories): Promise<Updat
 		added: [],
 		removed: [],
 		keptOverRemoval: [],
-		leftOut: []
+		leftOut: [],
+		claudeMdChanged: await claudeMdChanged(directories)
 	};
 	const [baseFiles, theirFiles, projectFiles] = await Promise.all([
 		listAreas(directories.base, MERGE_AREAS),
@@ -313,6 +330,11 @@ export async function runUpdate(): Promise<void> {
 	list('Added', report.added);
 	list('Removed', report.removed);
 	list('Removed here, changed in suede: left out', report.leftOut);
+	if (report.claudeMdChanged) {
+		prompts.log.message(
+			`${paint('yellow', "suede's CLAUDE.md changed")}; port what applies by hand:\n  https://github.com/${TEMPLATE_REPO}/compare/${from}...${drift.latest}`
+		);
+	}
 	if (suedeCss) {
 		prompts.log.message(
 			`${paint('yellow', '@taurean/suede-css')} ${suedeCss.from} → ${suedeCss.to}: check the project's CSS`

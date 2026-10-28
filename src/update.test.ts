@@ -165,6 +165,34 @@ describe('applyUpdate', () => {
 		expect(report.removed).toEqual([]);
 		expect(report.keptOverRemoval).toEqual([]);
 	});
+
+	it("reports a change to suede's CLAUDE.md and leaves the project's own CLAUDE.md untouched", async () => {
+		const ownClaudeMd = '# CLAUDE.md — snark-jar\n\nOur own rules, rewritten from scratch.\n';
+		write(base, 'CLAUDE.md', lines({ 0: '# CLAUDE.md' }));
+		write(theirs, 'CLAUDE.md', lines({ 0: '# CLAUDE.md', 5: 'a new suede rule' }));
+		write(project, 'CLAUDE.md', ownClaudeMd);
+
+		const changed = await applyUpdate({ base, theirs, project });
+
+		expect(changed.claudeMdChanged).toBe(true);
+		expect(read(project, 'CLAUDE.md')).toBe(ownClaudeMd);
+
+		const unchangedBase = join(container, 'unchanged-base');
+		const unchangedTheirs = join(container, 'unchanged-theirs');
+		const unchangedProject = join(container, 'unchanged-project');
+		write(unchangedBase, 'CLAUDE.md', lines({ 0: '# CLAUDE.md' }));
+		write(unchangedTheirs, 'CLAUDE.md', lines({ 0: '# CLAUDE.md' }));
+		write(unchangedProject, 'CLAUDE.md', ownClaudeMd);
+
+		const unchanged = await applyUpdate({
+			base: unchangedBase,
+			theirs: unchangedTheirs,
+			project: unchangedProject
+		});
+
+		expect(unchanged.claudeMdChanged).toBe(false);
+		expect(read(unchangedProject, 'CLAUDE.md')).toBe(ownClaudeMd);
+	});
 });
 
 describe('replaceSuedeFrom', () => {
