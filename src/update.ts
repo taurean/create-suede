@@ -324,11 +324,10 @@ export async function runUpdate(): Promise<void> {
 	spinner.stop(
 		`Merged suede ${paint('bold', drift.latest)} into ${paint('bold', branch)}, uncommitted`
 	);
-	list(paint('yellow', 'Conflicts to resolve'), report.conflicted);
-	list(
-		paint('yellow', 'Removed in suede, edited here: kept, decide whether to delete'),
-		report.keptOverRemoval
-	);
+	list(paint('yellow', 'Conflicts to resolve'), [
+		...report.conflicted,
+		...report.keptOverRemoval.map((path) => `${path}  (removed in suede, edited here: kept)`)
+	]);
 	list('Merged', report.merged);
 	list('Added', report.added);
 	list('Removed', report.removed);
