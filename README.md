@@ -36,7 +36,7 @@ Prints this CLI's version, the latest `create-suede` on npm, and the latest sued
 
 ## Working in a project
 
-Run these from the project's `main/` checkout or from any task worktree. `suede task` and `suede done` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release` and `suede status` still need a suede project.
+Run these from the project's `main/` checkout or from any task worktree. `suede task` and `suede done` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release`, `suede status` and `suede update` still need a suede project.
 
 ```bash
 suede task feat/login   # new worktree at ../feat-login on branch feat/login, off the latest main
@@ -44,6 +44,7 @@ suede done              # remove worktrees whose branches are merged, then fast-
 suede release [level]   # commit the version bump on this branch (level: patch|minor|major, semver only)
 suede release --tag     # after the merge: tag main's merge commit with its version and push the tag
 suede status            # how far suede.from is behind the latest suede tag, with the changelog
+suede update            # merge the latest suede's skills and agents into a new worktree, uncommitted
 ```
 
 `suede task` fetches `origin`, runs `git worktree add ../<type>-<slug> -b <type>/<slug> origin/main` (local `main` when there's no remote), runs `pnpm install` in the new worktree, and copies its `cd` command to your clipboard. It installs only with pnpm: when the main checkout has no `pnpm-lock.yaml` and no `packageManager` naming pnpm, it stops before creating anything.
@@ -55,6 +56,14 @@ suede status            # how far suede.from is behind the latest suede tag, wit
 `suede release --tag` fetches `origin`, reads the version from `origin/main`'s `package.json`, creates an annotated tag on that commit, and pushes only the tag. It refuses when the tag already exists.
 
 `suede status` reads suede's tags with `git ls-remote` and reports how far `suede.from` is behind the latest one, two ways: releases behind (every newer tag, each `.N` cut counting as one) and days behind (the gap between the two tags' dates). When it's behind, it prints the changelog, `git log <suede.from>..<latest>`, read from a treeless clone of suede (commits only) in a temporary directory that it removes afterwards. It changes nothing in the project. It stops with an error when `suede.from` isn't a chronver tag that exists on suede.
+
+`suede update` brings in what changed in suede between `suede.from` and the latest tag, and stops before committing anything so the update gets reviewed like any other change. It downloads both tags, creates a `chore/suede-update-<tag>` worktree beside the main checkout off the latest main (as `suede task` does), and writes into it:
+
+- `.claude/skills/` and `.claude/agents/`, merged three ways per file with `git merge-file`: suede at `suede.from` is the base, suede at the latest tag is one side, the project is the other. Overlapping edits are left as conflict markers, never resolved for you. A file suede added is added. A file suede removed is deleted when the project hadn't edited it, and kept and listed when it had. A skill directory or agent file the project deleted stays deleted, and is listed when suede changed it since.
+- New files under `src/lib/components/` that suede added since `suede.from`. Components the project already has are never changed, and ones it deleted stay out.
+- `suede.from`, set to the latest tag, and `@taurean/suede-css`, set to suede's range when the project's is older (majors included), followed by `pnpm install`. Both are edited as text, so the diff is those lines.
+
+It prints the conflicts, everything it added, removed or left out, the changelog, and a GitHub compare link when suede's `CLAUDE.md` changed. It never touches `CLAUDE.md`: kickoff rewrites it in every project, so port what applies by hand. It doesn't commit, push or open a pull request; resolve the conflicts, review, and commit on the branch. At the latest tag it says so and creates nothing. It stops with an error when the update's branch or worktree already exists.
 
 ## Development
 
