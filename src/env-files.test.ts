@@ -43,7 +43,7 @@ describe('linkEnvFiles', () => {
 		git(main, 'config', 'user.email', 'story-test@example.com');
 		git(main, 'config', 'commit.gpgsign', 'false');
 
-		write(main, '.gitignore', '.env\n.env.local\n.dev.vars\nsecrets.json\n');
+		write(main, '.gitignore', '.env\n.env.local\n.dev.vars\nsecrets.json\n.env.d/\n');
 		write(main, '.env.example', 'API_KEY=\n');
 		git(main, 'add', '.gitignore', '.env.example');
 		git(main, 'commit', '--quiet', '-m', 'initial');
@@ -53,13 +53,15 @@ describe('linkEnvFiles', () => {
 		write(main, '.dev.vars', 'DEV_VAR=main\n');
 		write(main, '.env.test', 'TEST=main\n');
 		write(main, 'secrets.json', '{"token":"main"}\n');
+		mkdirSync(join(main, '.env.d'));
+		write(main, '.env.d/extra', 'EXTRA=main\n');
 
 		git(main, 'worktree', 'add', '--quiet', '-b', 'feat/story', worktree);
 	});
 
 	afterEach(() => rmSync(container, { recursive: true, force: true }));
 
-	it('links only the ignored env files into a new worktree, not other ignored files, as relative symlinks, leaving git status clean', async () => {
+	it('links only the root-level ignored env files into a new worktree, not other ignored files or env files in subdirectories, as relative symlinks, leaving git status clean', async () => {
 		const ignored = ['.dev.vars', '.env', '.env.local'];
 
 		const linked = await linkEnvFiles(main, worktree);
@@ -80,6 +82,8 @@ describe('linkEnvFiles', () => {
 		expect(existsSync(join(worktree, '.env.test'))).toBe(false);
 		// An ignored file without an env name is left alone too.
 		expect(existsSync(join(worktree, 'secrets.json'))).toBe(false);
+		// An ignored env file inside a subdirectory is not linked, nor is its directory.
+		expect(existsSync(join(worktree, '.env.d'))).toBe(false);
 
 		expect(git(worktree, 'status', '--porcelain', '--untracked-files=all')).toBe('');
 	});
