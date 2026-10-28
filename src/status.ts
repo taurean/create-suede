@@ -164,14 +164,11 @@ export function formatStatus(report: StatusReport, pullRequests: Lookup<PullRequ
 	const branches = new Set(report.tasks.map((task) => task.branch));
 	const unmatched = open.filter((pr) => !branches.has(pr.branch));
 	if (unmatched.length > 0) {
-		const numberWidth = Math.max(...unmatched.map((pr) => String(pr.number).length)) + 1;
 		const branchWidth = Math.max(...unmatched.map((pr) => pr.branch.length));
 		if (lines.length > 0) lines.push('');
 		lines.push(paint('dim', 'Open PRs without a worktree'));
 		for (const pr of unmatched) {
-			const number = `#${pr.number}`.padEnd(numberWidth);
-			const status = `${pr.draft ? 'draft' : 'ready'}, ${CHECKS_TEXT[pr.checks]}`;
-			lines.push(`${number}  ${pr.branch.padEnd(branchWidth)}  ${status}`);
+			lines.push(`${pr.branch.padEnd(branchWidth)}  ${pullRequestNote(pr)}`);
 		}
 	}
 	if (!pullRequests.ok) {
