@@ -5,10 +5,9 @@ import { findGitRoot, NOT_A_GIT_REPO } from './project.ts';
 import { paint, tildify } from './style.ts';
 import {
 	hasOrigin,
-	hasOwnCommits,
 	isDirty,
 	listWorktrees,
-	mergedBranches,
+	mergedTaskBranches,
 	planRemovals,
 	removeWorktrees
 } from './worktree.ts';
@@ -30,10 +29,7 @@ export async function runDone(): Promise<void> {
 	if (remote) await run('git', ['fetch', '--quiet', '--prune', 'origin'], main.path);
 	const base = remote ? 'origin/main' : 'main';
 
-	const merged = new Set<string>();
-	for (const branch of await mergedBranches(main.path, base)) {
-		if (await hasOwnCommits(main.path, branch)) merged.add(branch);
-	}
+	const merged = await mergedTaskBranches(main.path, base);
 	const dirty = new Set<string>();
 	for (const worktree of worktrees.slice(1)) {
 		if (worktree.branch && merged.has(worktree.branch) && (await isDirty(worktree.path))) {

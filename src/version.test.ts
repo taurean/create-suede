@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { chronverTags } from './chronver.ts';
+import type { Lookup } from './lookup.ts';
+import { measureDrift, type Drift } from './template.ts';
 import { formatVersionReport, upgradeCommand, type VersionReport } from './version.ts';
 
 const current: VersionReport = {
 	installed: '0.7.1',
 	npmLatest: { ok: true, value: '0.7.1' },
 	suedeLatest: { ok: true, value: '2026.10.26' },
-	projectFrom: undefined,
+	project: undefined,
 	upgradeCommand: 'volta install create-suede@latest'
 };
 
@@ -43,11 +46,43 @@ describe('formatVersionReport', () => {
 		expect(output).not.toContain('Upgrade');
 	});
 
-	it('adds suede.from and points to suede status inside a project', () => {
-		expect(formatVersionReport(current)).not.toContain('suede.from');
-		expect(formatVersionReport({ ...current, projectFrom: '2026.10.21.3' })).toMatch(
-			/suede\.from\s+2026\.10\.21\.3\s+suede status shows drift/
+	it('shows how far suede.from is behind suede, that it is the latest, or why drift is unavailable', () => {
+		const tags = chronverTags(
+			['2026.9.30.1', '2026.10.17', '2026.10.21', '2026.10.21.1', '2026.10.26']
+				.map((tag) => `abc\trefs/tags/${tag}`)
+				.join('\n')
 		);
+		const fromRow = (output: string) =>
+			output.split('\n').filter((line) => /^\s*suede\.from\b/.test(line));
+		const withProject = (from: string, drift: Lookup<Drift>) =>
+			formatVersionReport({ ...current, project: { from, drift } });
+
+		expect(fromRow(formatVersionReport(current))).toEqual([]);
+
+		const [behind] = fromRow(
+			withProject('2026.9.30.1', { ok: true, value: measureDrift('2026.9.30.1', tags) })
+		);
+		expect(behind).toContain('2026.9.30.1');
+		expect(behind).toMatch(/\b4 releases?\b/);
+		expect(behind).toMatch(/\b26 days?\b/);
+		expect(behind).toContain('suede update');
+
+		const [atLatest] = fromRow(
+			withProject('2026.10.26', { ok: true, value: measureDrift('2026.10.26', tags) })
+		);
+		expect(atLatest).toContain('2026.10.26');
+		expect(atLatest).toContain('latest');
+
+		let reason = '';
+		try {
+			measureDrift('0.1.0', tags);
+		} catch (error) {
+			reason = (error as Error).message;
+		}
+		expect(reason).not.toBe('');
+		const [unavailable] = fromRow(withProject('0.1.0', { ok: false, reason }));
+		expect(unavailable).toContain('unavailable');
+		expect(unavailable).toContain(reason);
 	});
 });
 

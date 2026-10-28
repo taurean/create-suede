@@ -21,7 +21,7 @@ Commands:
 
 Options:
   -h, --help      Show this message
-  -v, --version   Show this CLI's version and the latest create-suede and suede`;
+  -v, --version   Show this CLI's version, the latest create-suede and suede, and drift`;
 
 const args = parse(process.argv.slice(2), {
 	boolean: ['help', 'tag', 'version'],

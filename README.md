@@ -30,20 +30,20 @@ Then open Claude Code in the new directory and run `/suede-kickoff`.
 suede --version          # or -v; create-suede --version prints the same
 ```
 
-Prints this CLI's version, the latest `create-suede` on npm, and the latest suede tag (resolved the same way `suede new` resolves it). When the installed CLI is behind npm, it names the upgrade command for how it was installed: `volta install`, `pnpm add -g`, or `npm install -g`. Inside a suede project it adds the project's `suede.from`; `suede status` reports the drift. If npm or GitHub can't be reached, that line says so and the rest still prints, exiting 0.
+Prints this CLI's version, the latest `create-suede` on npm, and the latest suede tag (resolved the same way `suede new` resolves it). When the installed CLI is behind npm, it names the upgrade command for how it was installed: `volta install`, `pnpm add -g`, or `npm install -g`. Inside a suede project it adds the project's `suede.from` and how far it's behind the latest suede tag, two ways: releases behind (every newer tag, each `.N` cut counting as one) and days behind (the gap between the two tags' dates), pointing at `suede update` when there's anything to bring in. The drift comes from the same `git ls-remote` as the latest tag, so it costs no extra call; when `suede.from` isn't a tag on suede, that row says why. If npm or GitHub can't be reached, that line says so and the rest still prints, exiting 0.
 
 `~/Developer/<name>/` is a container: `main/` is the primary checkout, and task worktrees go beside it (`git worktree add ../<type>-<slug> -b <type>/<slug> origin/main`).
 
 ## Working in a project
 
-Run these from the project's `main/` checkout or from any task worktree. `suede task` and `suede done` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release`, `suede status` and `suede update` still need a suede project.
+Run these from the project's `main/` checkout or from any task worktree. `suede task`, `suede done` and `suede status` need only git, not `suede.from`: they run in any git repository with task worktrees beside the main checkout, suede project or not, and stop with an error outside a git repository. `suede release` and `suede update` still need a suede project.
 
 ```bash
 suede task feat/login   # new worktree at ../feat-login on branch feat/login, off the latest main
 suede done              # remove worktrees whose branches are merged, then fast-forward main
 suede release [level]   # commit the version bump on this branch (level: patch|minor|major, semver only)
 suede release --tag     # after the merge: tag main's merge commit with its version and push the tag
-suede status            # how far suede.from is behind the latest suede tag, with the changelog
+suede status            # each task worktree: uncommitted, merged and ready for done, its open PR
 suede update            # merge the latest suede's skills and agents into a new worktree, uncommitted
 ```
 
@@ -55,7 +55,7 @@ suede update            # merge the latest suede's skills and agents into a new 
 
 `suede release --tag` fetches `origin`, reads the version from `origin/main`'s `package.json`, creates an annotated tag on that commit, and pushes only the tag. It refuses when the tag already exists.
 
-`suede status` reads suede's tags with `git ls-remote` and reports how far `suede.from` is behind the latest one, two ways: releases behind (every newer tag, each `.N` cut counting as one) and days behind (the gap between the two tags' dates). When it's behind, it prints the changelog, `git log <suede.from>..<latest>`, read from a treeless clone of suede (commits only) in a temporary directory that it removes afterwards. It changes nothing in the project. It stops with an error when `suede.from` isn't a chronver tag that exists on suede.
+`suede status` fetches `origin` (without pruning) and lists each task worktree beside the main checkout: its branch and path, whether it has uncommitted changes, and whether it's merged into `origin/main` with commits of its own, the same test `suede done` uses to remove it. Next to each one it shows the open pull request on that branch from `gh pr list`: its number, draft or ready, and its checks, summarised as GitHub shows them (failing, pending, passing, or none). Open pull requests whose branch has no worktree here are listed after. When `gh` isn't installed or signed in, one line says so and the worktrees still print. It changes nothing in the project and says nothing about suede; `suede --version` shows the drift.
 
 `suede update` brings in what changed in suede between `suede.from` and the latest tag, and stops before committing anything so the update gets reviewed like any other change. It downloads both tags, creates a `chore/suede-update-<tag>` worktree beside the main checkout off the latest main (as `suede task` does), and writes into it:
 
