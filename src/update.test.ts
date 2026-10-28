@@ -140,6 +140,31 @@ describe('applyUpdate', () => {
 		expect(report.merged).toEqual([]);
 		expect(report.conflicted).toEqual([]);
 	});
+
+	it("adds components suede added, keeps out ones the project deleted, and leaves the project's components unchanged", async () => {
+		const added = 'src/lib/components/Badge.svelte';
+		const deleted = 'src/lib/components/Card.svelte';
+		const kept = 'src/lib/components/Button.svelte';
+		write(theirs, added, lines({ 0: '<script>badge</script>' }));
+		write(base, deleted, lines());
+		write(theirs, deleted, lines({ 4: 'suede edit' }));
+		write(base, kept, lines());
+		write(theirs, kept, lines({ 4: 'suede edit' }));
+		const ownButton = lines({ 7: 'project edit' });
+		write(project, kept, ownButton);
+
+		const report = await applyUpdate({ base, theirs, project });
+
+		expect(read(project, added)).toBe(lines({ 0: '<script>badge</script>' }));
+		expect(existsSync(join(project, deleted))).toBe(false);
+		expect(read(project, kept)).toBe(ownButton);
+		expect(report.added).toEqual([added]);
+		expect(report.leftOut).toEqual([deleted]);
+		expect(report.merged).toEqual([]);
+		expect(report.conflicted).toEqual([]);
+		expect(report.removed).toEqual([]);
+		expect(report.keptOverRemoval).toEqual([]);
+	});
 });
 
 describe('replaceSuedeFrom', () => {

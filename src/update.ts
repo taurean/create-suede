@@ -20,6 +20,9 @@ const execFileAsync = promisify(execFile);
 /** The process layer: merged three ways, file by file. */
 const MERGE_AREAS = ['.claude/skills/', '.claude/agents/'];
 
+/** Suede's components: new files are added, the project's own are never touched. */
+const ADD_ONLY_AREAS = ['src/lib/components/'];
+
 export interface UpdateDirectories {
 	/** suede at the project's `suede.from`. */
 	base: string;
@@ -34,13 +37,13 @@ export interface UpdateReport {
 	merged: string[];
 	/** Files left holding conflict markers. */
 	conflicted: string[];
-	/** Files suede added, copied in. */
+	/** Files suede added, copied in: skills, agents, and components. */
 	added: string[];
 	/** Files suede removed that the project hadn't edited, deleted. */
 	removed: string[];
 	/** Files suede removed that the project edited, kept for a person to decide. */
 	keptOverRemoval: string[];
-	/** Skill directories or files the project deleted and suede changed since, left out. */
+	/** Skill directories, agents, or components the project deleted and suede changed since, left out. */
 	leftOut: string[];
 }
 
@@ -97,7 +100,8 @@ function inUnit(path: string, unit: string): boolean {
 
 /**
  * Writes suede's changes between `base` and `theirs` into `project`'s process
- * layer, three ways, and reports what it did. Changes nothing outside the areas.
+ * layer, three ways, adds suede's new components, and reports what it did.
+ * Changes nothing outside those areas.
  */
 export async function applyUpdate(directories: UpdateDirectories): Promise<UpdateReport> {
 	const report: UpdateReport = {
@@ -166,7 +170,39 @@ export async function applyUpdate(directories: UpdateDirectories): Promise<Updat
 	} finally {
 		await rm(scratch, { recursive: true, force: true });
 	}
+
+	await addNewFiles(directories, report);
 	return report;
+}
+
+/**
+ * Copies in files suede added under the add-only areas since `suede.from`. A file
+ * suede already had is the project's: kept as is when present, and left out when
+ * the project deleted it.
+ */
+async function addNewFiles(directories: UpdateDirectories, report: UpdateReport): Promise<void> {
+	const [baseFiles, theirFiles, projectFiles] = await Promise.all([
+		listAreas(directories.base, ADD_ONLY_AREAS),
+		listAreas(directories.theirs, ADD_ONLY_AREAS),
+		listAreas(directories.project, ADD_ONLY_AREAS)
+	]);
+	const [baseSet, projectSet] = [new Set(baseFiles), new Set(projectFiles)];
+
+	for (const path of theirFiles) {
+		const projectPath = join(directories.project, path);
+		if (baseSet.has(path)) {
+			if (projectSet.has(path)) continue;
+			const [base, theirs] = await Promise.all([
+				readFile(join(directories.base, path)),
+				readFile(join(directories.theirs, path))
+			]);
+			if (!base.equals(theirs)) report.leftOut.push(path);
+		} else if (!projectSet.has(path)) {
+			await mkdir(dirname(projectPath), { recursive: true });
+			await copyFile(join(directories.theirs, path), projectPath);
+			report.added.push(path);
+		}
+	}
 }
 
 /**
