@@ -1,5 +1,6 @@
 import { readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
+import { lookup, type Lookup } from './lookup.ts';
 import { findProjectRoot } from './project.ts';
 import { paint } from './style.ts';
 import { resolveLatestTag, TEMPLATE_REPO } from './template.ts';
@@ -9,12 +10,10 @@ const PACKAGE_NAME = 'create-suede';
 const REGISTRY_URL = `https://registry.npmjs.org/-/package/${PACKAGE_NAME}/dist-tags`;
 const REGISTRY_TIMEOUT_MS = 5000;
 
-export type Lookup = { ok: true; value: string } | { ok: false; reason: string };
-
 export interface VersionReport {
 	installed: string;
-	npmLatest: Lookup;
-	suedeLatest: Lookup;
+	npmLatest: Lookup<string>;
+	suedeLatest: Lookup<string>;
 	/** `suede.from` of the project around the current directory, if any. */
 	projectFrom: string | undefined;
 	upgradeCommand: string;
@@ -37,24 +36,6 @@ export function upgradeCommand(binaryPath: string): string {
 	return `npm install -g ${PACKAGE_NAME}@latest`;
 }
 
-/** One line of cause. run() puts stderr after the invocation line, so the last line carries it. */
-function lastLine(error: unknown): string {
-	const message = error instanceof Error ? error.message : String(error);
-	const lines = message
-		.split('\n')
-		.map((line) => line.trim())
-		.filter(Boolean);
-	return lines.at(-1) ?? message;
-}
-
-async function lookup(source: string, read: () => Promise<string>): Promise<Lookup> {
-	try {
-		return { ok: true, value: await read() };
-	} catch (error) {
-		return { ok: false, reason: `${source}: ${lastLine(error)}` };
-	}
-}
-
 async function fetchNpmLatest(): Promise<string> {
 	const response = await fetch(REGISTRY_URL, { signal: AbortSignal.timeout(REGISTRY_TIMEOUT_MS) });
 	if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -74,7 +55,7 @@ function row(label: string, value: string): string {
 	return `${paint('dim', label.padEnd(14))}${value}`;
 }
 
-function lookupValue(result: Lookup): string {
+function lookupValue(result: Lookup<string>): string {
 	return result.ok ? result.value : paint('yellow', `unavailable: ${result.reason}`);
 }
 
