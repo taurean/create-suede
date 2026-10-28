@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import * as prompts from '@clack/prompts';
 import { copyToClipboard } from './clipboard.ts';
@@ -34,6 +34,14 @@ export interface UpdateReport {
 	merged: string[];
 	/** Files left holding conflict markers. */
 	conflicted: string[];
+	/** Files suede added, copied in. */
+	added: string[];
+	/** Files suede removed that the project hadn't edited, deleted. */
+	removed: string[];
+	/** Files suede removed that the project edited, kept for a person to decide. */
+	keptOverRemoval: string[];
+	/** Skill directories or files the project deleted and suede changed since, left out. */
+	leftOut: string[];
 }
 
 async function readIfExists(path: string): Promise<Buffer | undefined> {
@@ -59,8 +67,32 @@ async function mergeFile(current: string, base: string, other: string): Promise<
 	}
 }
 
-function inArea(path: string, areas: string[]): boolean {
-	return areas.some((area) => path.startsWith(area));
+/** Every file under `areas` in `directory`, as paths relative to `directory`. */
+async function listAreas(directory: string, areas: string[]): Promise<string[]> {
+	const perArea = await Promise.all(
+		areas.map(async (area) =>
+			existsSync(join(directory, area))
+				? (await listFiles(join(directory, area))).map((file) => `${area}${file}`)
+				: []
+		)
+	);
+	return perArea.flat();
+}
+
+const SKILLS = '.claude/skills/';
+
+/**
+ * What a project removes as a whole: a skill is its directory, anything else is
+ * its file. A skill the project deleted stays deleted, every file in it.
+ */
+export function deletionUnit(path: string): string {
+	if (!path.startsWith(SKILLS)) return path;
+	const [name] = path.slice(SKILLS.length).split('/');
+	return `${SKILLS}${name}/`;
+}
+
+function inUnit(path: string, unit: string): boolean {
+	return unit.endsWith('/') ? path.startsWith(unit) : path === unit;
 }
 
 /**
@@ -68,28 +100,71 @@ function inArea(path: string, areas: string[]): boolean {
  * layer, three ways, and reports what it did. Changes nothing outside the areas.
  */
 export async function applyUpdate(directories: UpdateDirectories): Promise<UpdateReport> {
-	const report: UpdateReport = { merged: [], conflicted: [] };
-	const [baseFiles, theirFiles] = await Promise.all([
-		listFiles(directories.base),
-		listFiles(directories.theirs)
+	const report: UpdateReport = {
+		merged: [],
+		conflicted: [],
+		added: [],
+		removed: [],
+		keptOverRemoval: [],
+		leftOut: []
+	};
+	const [baseFiles, theirFiles, projectFiles] = await Promise.all([
+		listAreas(directories.base, MERGE_AREAS),
+		listAreas(directories.theirs, MERGE_AREAS),
+		listAreas(directories.project, MERGE_AREAS)
 	]);
-	const theirSet = new Set(theirFiles);
+	const [baseSet, theirSet] = [new Set(baseFiles), new Set(theirFiles)];
+	const removedUnits = new Set(
+		baseFiles.map(deletionUnit).filter((unit) => !projectFiles.some((file) => inUnit(file, unit)))
+	);
 
-	for (const path of baseFiles.filter((file) => inArea(file, MERGE_AREAS))) {
-		if (!theirSet.has(path)) continue;
-		const projectPath = join(directories.project, path);
-		const [base, theirs, ours] = await Promise.all([
-			readFile(join(directories.base, path)),
-			readFile(join(directories.theirs, path)),
-			readIfExists(projectPath)
-		]);
-		if (!ours || base.equals(theirs)) continue;
-		const conflicted = await mergeFile(
-			projectPath,
-			join(directories.base, path),
-			join(directories.theirs, path)
-		);
-		(conflicted ? report.conflicted : report.merged).push(path);
+	// Both sides added a file suede.from didn't have: merged against an empty base.
+	const scratch = await mkdtemp(join(tmpdir(), 'suede-merge-'));
+	const emptyBase = join(scratch, 'empty');
+	await writeFile(emptyBase, '');
+	try {
+		for (const path of [...new Set([...baseFiles, ...theirFiles])].sort()) {
+			const basePath = join(directories.base, path);
+			const theirPath = join(directories.theirs, path);
+			const projectPath = join(directories.project, path);
+			const [base, theirs, ours] = await Promise.all([
+				baseSet.has(path) ? readFile(basePath) : undefined,
+				theirSet.has(path) ? readFile(theirPath) : undefined,
+				readIfExists(projectPath)
+			]);
+			const changedUpstream = !base || !theirs || !base.equals(theirs);
+
+			const unit = deletionUnit(path);
+			if (removedUnits.has(unit)) {
+				if (changedUpstream && !report.leftOut.includes(unit)) report.leftOut.push(unit);
+				continue;
+			}
+			if (!changedUpstream) continue;
+
+			if (!theirs) {
+				if (!ours || !base) continue;
+				if (ours.equals(base)) {
+					await rm(projectPath);
+					report.removed.push(path);
+				} else {
+					report.keptOverRemoval.push(path);
+				}
+			} else if (!ours) {
+				if (base) {
+					// The project deleted this one file from a skill it kept.
+					report.leftOut.push(path);
+				} else {
+					await mkdir(dirname(projectPath), { recursive: true });
+					await copyFile(theirPath, projectPath);
+					report.added.push(path);
+				}
+			} else if (!ours.equals(theirs)) {
+				const conflicted = await mergeFile(projectPath, base ? basePath : emptyBase, theirPath);
+				(conflicted ? report.conflicted : report.merged).push(path);
+			}
+		}
+	} finally {
+		await rm(scratch, { recursive: true, force: true });
 	}
 	return report;
 }
@@ -187,7 +262,14 @@ export async function runUpdate(): Promise<void> {
 		`Merged suede ${paint('bold', drift.latest)} into ${paint('bold', branch)}, uncommitted`
 	);
 	list(paint('yellow', 'Conflicts to resolve'), report.conflicted);
+	list(
+		paint('yellow', 'Removed in suede, edited here: kept, decide whether to delete'),
+		report.keptOverRemoval
+	);
 	list('Merged', report.merged);
+	list('Added', report.added);
+	list('Removed', report.removed);
+	list('Removed here, changed in suede: left out', report.leftOut);
 	prompts.log.message(changelog.join('\n'));
 
 	const cdCommand = `cd ${tildify(worktreePath)}`;

@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -80,6 +88,57 @@ describe('applyUpdate', () => {
 		expect(merged.indexOf('suede wording')).toBeGreaterThan(merged.indexOf('=======\n'));
 		expect(report.conflicted).toEqual([SKILL]);
 		expect(report.merged).not.toContain(SKILL);
+	});
+
+	it('adds a skill suede added and removes an agent suede removed that the project had not edited', async () => {
+		const addedSkill = '.claude/skills/ship/SKILL.md';
+		const removedAgent = '.claude/agents/old-reviewer.md';
+		write(base, removedAgent, lines());
+		write(project, removedAgent, lines());
+		write(theirs, addedSkill, lines({ 0: '# ship' }));
+
+		const report = await applyUpdate({ base, theirs, project });
+
+		expect(read(project, addedSkill)).toBe(lines({ 0: '# ship' }));
+		expect(existsSync(join(project, removedAgent))).toBe(false);
+		expect(report.added).toEqual([addedSkill]);
+		expect(report.removed).toEqual([removedAgent]);
+		expect(report.conflicted).toEqual([]);
+		expect(report.keptOverRemoval).toEqual([]);
+	});
+
+	it('keeps a file suede removed when the project had edited it, untouched', async () => {
+		const edited = lines({ 3: 'project addition' });
+		write(base, AGENT, lines());
+		write(project, AGENT, edited);
+
+		const report = await applyUpdate({ base, theirs, project });
+
+		expect(read(project, AGENT)).toBe(edited);
+		expect(report.keptOverRemoval).toEqual([AGENT]);
+		expect(report.removed).not.toContain(AGENT);
+	});
+
+	it('leaves out a skill directory and an agent file the project deleted and suede changed since, listing each once', async () => {
+		const skillDirectory = '.claude/skills/retired/';
+		const agent = '.claude/agents/retired.md';
+		write(base, `${skillDirectory}SKILL.md`, lines());
+		write(theirs, `${skillDirectory}SKILL.md`, lines({ 6: 'suede edit' }));
+		write(theirs, `${skillDirectory}notes.md`, lines({ 0: '# notes' }));
+		write(base, agent, lines());
+		write(theirs, agent, lines({ 2: 'suede edit' }));
+		// The project has neither: it deleted both before this update.
+		mkdirSync(join(project, '.claude/skills'), { recursive: true });
+		mkdirSync(join(project, '.claude/agents'), { recursive: true });
+
+		const report = await applyUpdate({ base, theirs, project });
+
+		expect(existsSync(join(project, skillDirectory))).toBe(false);
+		expect(existsSync(join(project, agent))).toBe(false);
+		expect([...report.leftOut].sort()).toEqual([agent, skillDirectory]);
+		expect(report.added).toEqual([]);
+		expect(report.merged).toEqual([]);
+		expect(report.conflicted).toEqual([]);
 	});
 });
 
