@@ -73,6 +73,11 @@ export async function listWorktrees(cwd: string): Promise<Worktree[]> {
 	return parseWorktreeList(await run('git', ['worktree', 'list', '--porcelain'], cwd));
 }
 
+export async function branchExists(cwd: string, branch: string): Promise<boolean> {
+	const output = await run('git', ['branch', '--list', branch], cwd);
+	return output.trim() !== '';
+}
+
 export async function hasOrigin(cwd: string): Promise<boolean> {
 	const remotes = await run('git', ['remote'], cwd);
 	return remotes.split('\n').includes('origin');

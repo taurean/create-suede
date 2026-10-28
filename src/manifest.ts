@@ -1,4 +1,4 @@
-import type { Versioning } from './versioning.ts';
+import { compareSemver, type Versioning } from './versioning.ts';
 
 export interface ProjectFields {
 	name: string;
@@ -90,4 +90,55 @@ export function replaceVersionText(
 	return source.replace(field, (match, key: string) =>
 		replaced++ < count ? `${key}${JSON.stringify(to)}` : match
 	);
+}
+
+const SUEDE_CSS = '@taurean/suede-css';
+
+interface Dependencies {
+	dependencies?: Record<string, string>;
+	devDependencies?: Record<string, string>;
+}
+
+function suedeCssRange(source: string): string | undefined {
+	const manifest = JSON.parse(source) as Dependencies;
+	return manifest.dependencies?.[SUEDE_CSS] ?? manifest.devDependencies?.[SUEDE_CSS];
+}
+
+function escapeRegExp(text: string): string {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export interface SuedeCssBump {
+	source: string;
+	from: string;
+	to: string;
+}
+
+/**
+ * Moves the project's suede-css range up to the one in suede's package.json, as
+ * text, majors included: suede's skills are written against that version. Returns
+ * undefined when the project doesn't depend on suede-css, suede doesn't, or the
+ * project is already at or past suede's version.
+ */
+export function bumpSuedeCss(projectSource: string, suedeSource: string): SuedeCssBump | undefined {
+	const [ours, theirs] = [suedeCssRange(projectSource), suedeCssRange(suedeSource)];
+	if (!ours || !theirs) return undefined;
+	const difference = compareSemver(ours.replace(/^[\^~]/, ''), theirs.replace(/^[\^~]/, ''));
+	if (difference === undefined) {
+		throw new Error(
+			`Can't compare ${SUEDE_CSS} "${ours}" (project) with "${theirs}" (suede): expected ^x.y.z, ~x.y.z or x.y.z.`
+		);
+	}
+	if (difference >= 0) return undefined;
+
+	const field = new RegExp(`("${escapeRegExp(SUEDE_CSS)}"\\s*:\\s*)"${escapeRegExp(ours)}"`, 'g');
+	const matches = projectSource.match(field)?.length ?? 0;
+	if (matches !== 1) {
+		throw new Error(`Expected one "${SUEDE_CSS}": "${ours}" in package.json, found ${matches}.`);
+	}
+	return {
+		source: projectSource.replace(field, `$1${JSON.stringify(theirs)}`),
+		from: ours,
+		to: theirs
+	};
 }

@@ -4,6 +4,7 @@ import {
 	applyToDemoPage,
 	applyToPackageLock,
 	applyToWranglerConfig,
+	bumpSuedeCss,
 	replaceVersionText,
 	detectIndent
 } from './manifest.ts';
@@ -123,5 +124,44 @@ describe('replaceVersionText', () => {
 		expect(replaceVersionText('"version": "2026x9x30"', '2026.9.30', 'n', 1)).toBe(
 			'"version": "2026x9x30"'
 		);
+	});
+});
+
+describe('bumpSuedeCss', () => {
+	function packageJson(suedeCss: string | undefined): string {
+		return [
+			'{',
+			'\t"name": "snark-jar",',
+			'\t"version": "2026.9.29",',
+			'\t"private": true,',
+			'\t"dependencies": {',
+			...(suedeCss === undefined ? [] : [`\t\t"@taurean/suede-css": "${suedeCss}",`]),
+			'\t\t"@sveltejs/kit": "^2.20.0"',
+			'\t},',
+			'\t"devDependencies": {',
+			'\t\t"vitest": "^3.2.0"',
+			'\t},',
+			'\t"suede": {',
+			'\t\t"from": "2026.9.29",',
+			'\t\t"versioning": "chronver"',
+			'\t}',
+			'}',
+			''
+		].join('\n');
+	}
+
+	it("sets an older suede-css range to suede's, majors included, and leaves a newer or absent one alone", () => {
+		expect(bumpSuedeCss(packageJson('^0.12.1'), packageJson('^0.13.0'))).toEqual({
+			source: packageJson('^0.13.0'),
+			from: '^0.12.1',
+			to: '^0.13.0'
+		});
+		expect(bumpSuedeCss(packageJson('^0.12.1'), packageJson('^1.0.0'))).toEqual({
+			source: packageJson('^1.0.0'),
+			from: '^0.12.1',
+			to: '^1.0.0'
+		});
+		expect(bumpSuedeCss(packageJson('^0.14.0'), packageJson('^0.13.0'))).toBeUndefined();
+		expect(bumpSuedeCss(packageJson(undefined), packageJson('^0.13.0'))).toBeUndefined();
 	});
 });

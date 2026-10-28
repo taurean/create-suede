@@ -7,7 +7,8 @@ Project rulebook. Read at task start.
 create-suede is the command-line tool for
 [suede](https://github.com/taurean/suede). It ships two binaries: `create-suede`
 (run as `pnpm create suede`) scaffolds a new project from suede's latest tag,
-and `suede` runs the in-project commands — `new`, `task`, `done`, `release`. The
+and `suede` runs the in-project commands — `new`, `task`, `done`, `release`,
+`status`, `update`. The
 README is the user-facing contract for every command.
 
 This repo is itself a suede fork. It inherits suede's process layer — git

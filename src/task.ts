@@ -4,14 +4,15 @@ import { copyToClipboard } from './clipboard.ts';
 import { run } from './exec.ts';
 import { findGitRoot, NOT_A_GIT_REPO, NOT_PNPM, usesPnpm } from './project.ts';
 import { paint, tildify } from './style.ts';
-import { hasOrigin, listWorktrees, siblingPath, validateTaskBranch } from './worktree.ts';
+import {
+	branchExists,
+	hasOrigin,
+	listWorktrees,
+	siblingPath,
+	validateTaskBranch
+} from './worktree.ts';
 
 export const TASK_USAGE = 'Starts <type>/<slug> in a sibling worktree off the latest main.';
-
-async function branchExists(cwd: string, branch: string): Promise<boolean> {
-	const output = await run('git', ['branch', '--list', branch], cwd);
-	return output.trim() !== '';
-}
 
 export async function runTask(branch: string | undefined): Promise<void> {
 	const branchError = validateTaskBranch(branch);
