@@ -83,7 +83,7 @@ export async function hasOrigin(cwd: string): Promise<boolean> {
 	return remotes.split('\n').includes('origin');
 }
 
-export async function mergedBranches(cwd: string, base: string): Promise<Set<string>> {
+async function mergedBranches(cwd: string, base: string): Promise<Set<string>> {
 	const output = await run('git', ['branch', '--format=%(refname:short)', '--merged', base], cwd);
 	return new Set(output.split('\n').filter(Boolean));
 }
@@ -93,13 +93,25 @@ export async function mergedBranches(cwd: string, base: string): Promise<Set<str
  * whose oldest entry is the creation point; a branch without a reflog (expired or
  * never recorded) counts as having moved.
  */
-export async function hasOwnCommits(cwd: string, branch: string): Promise<boolean> {
+async function hasOwnCommits(cwd: string, branch: string): Promise<boolean> {
 	const entries = (await run('git', ['reflog', 'show', '--format=%H', `refs/heads/${branch}`], cwd))
 		.split('\n')
 		.filter(Boolean);
 	const [tip] = entries;
 	const creationPoint = entries.at(-1);
 	return entries.length === 0 || tip !== creationPoint;
+}
+
+/**
+ * Branches merged into `base` that did work before merging: `git branch --merged`
+ * also lists a fresh branch still at its start point, which `hasOwnCommits` drops.
+ */
+export async function mergedTaskBranches(cwd: string, base: string): Promise<Set<string>> {
+	const merged = new Set<string>();
+	for (const branch of await mergedBranches(cwd, base)) {
+		if (await hasOwnCommits(cwd, branch)) merged.add(branch);
+	}
+	return merged;
 }
 
 export interface RemovalResult {
