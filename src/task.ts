@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import * as prompts from '@clack/prompts';
 import { copyToClipboard } from './clipboard.ts';
+import { linkEnvFiles } from './env-files.ts';
 import { run } from './exec.ts';
 import { findGitRoot, NOT_A_GIT_REPO, NOT_PNPM, usesPnpm } from './project.ts';
 import { paint, tildify } from './style.ts';
@@ -36,6 +37,7 @@ export async function runTask(branch: string | undefined): Promise<void> {
 
 	const spinner = prompts.spinner({ indicator: 'timer' });
 	let base = 'main';
+	let linked: string[];
 	try {
 		if (await hasOrigin(main.path)) {
 			spinner.start('Fetching origin');
@@ -46,6 +48,9 @@ export async function runTask(branch: string | undefined): Promise<void> {
 		}
 		spinner.message(`Creating ${branch}`);
 		await run('git', ['worktree', 'add', '--quiet', worktreePath, '-b', branch, base], main.path);
+		// Before install, so an install script that reads env sees it.
+		spinner.message('Linking env files');
+		linked = await linkEnvFiles(main.path, worktreePath);
 		spinner.message('Installing dependencies');
 		await run('pnpm', ['install'], worktreePath);
 	} catch (error) {
@@ -53,6 +58,9 @@ export async function runTask(branch: string | undefined): Promise<void> {
 		throw error;
 	}
 	spinner.stop(`Created ${paint('bold', branch)} from ${paint('cyan', base)}`);
+	if (linked.length > 0) {
+		prompts.log.info(`Linked ${linked.join(', ')} from ${tildify(main.path)}`);
+	}
 
 	const cdCommand = `cd ${tildify(worktreePath)}`;
 	const copied = await copyToClipboard(cdCommand);
