@@ -271,11 +271,11 @@ export async function runUpdate(): Promise<void> {
 	const branch = `chore/suede-update-${drift.latest}`;
 	const worktreePath = siblingPath(main.path, branch);
 	if (existsSync(worktreePath)) {
-		spinner.error(`${tildify(worktreePath)} already exists`);
+		spinner.error('Could not start the update');
 		throw new Error(`${tildify(worktreePath)} already exists. Finish or remove that update first.`);
 	}
 	if (await branchExists(main.path, branch)) {
-		spinner.error(`Branch ${branch} already exists`);
+		spinner.error('Could not start the update');
 		throw new Error(`Branch ${branch} already exists. Finish or delete that update first.`);
 	}
 
