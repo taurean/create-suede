@@ -7,22 +7,28 @@ import { tildify } from './style.ts';
 const ENV_PATHSPECS = ['.env', '.env.*', '.dev.vars'];
 
 /**
- * Symlinks the main checkout's env files into a new task worktree and returns
- * their names. `git worktree add` checks out tracked files only, so without
- * this a task worktree starts with no secrets.
- *
- * Links only root-level files git ignores and doesn't track: a link to
- * anything else would show up as untracked in the worktree and could be
- * committed. Links are relative, so they survive the project folder moving.
+ * The checkout's root-level env files that git ignores and doesn't track, by name.
+ * Anything else would show up as untracked wherever it's copied or linked, and
+ * could be committed.
  */
-export async function linkEnvFiles(mainPath: string, worktreePath: string): Promise<string[]> {
+export async function listEnvFiles(checkoutPath: string): Promise<string[]> {
 	const output = await run(
 		'git',
 		['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', ...ENV_PATHSPECS],
-		mainPath
+		checkoutPath
 	);
 	// Pathspec globs cross `/`, so `.env.*` also matches files inside a `.env.d/`.
-	const names = output.split('\0').filter((path) => path !== '' && !path.includes('/'));
+	return output.split('\0').filter((path) => path !== '' && !path.includes('/'));
+}
+
+/**
+ * Symlinks the main checkout's env files into a new task worktree and returns
+ * their names. `git worktree add` checks out tracked files only, so without
+ * this a task worktree starts with no secrets. Links are relative, so they
+ * survive the project folder moving.
+ */
+export async function linkEnvFiles(mainPath: string, worktreePath: string): Promise<string[]> {
+	const names = await listEnvFiles(mainPath);
 	const target = relative(worktreePath, mainPath);
 	for (const name of names) {
 		try {

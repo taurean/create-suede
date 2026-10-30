@@ -24,6 +24,23 @@ The name argument is optional; without it, the CLI asks. It asks every question 
 
 Then open Claude Code in the new directory and run `/suede-kickoff`.
 
+## Adding suede to an existing project
+
+```bash
+suede install [name]   # from inside the existing repository
+```
+
+Run it from any checkout of a repository that has a `package.json` and an `origin` whose default branch is `main`. It leaves that checkout as it is and builds suede's layout beside it:
+
+1. Clones `origin` into `~/Developer/<name>/main`. The name defaults to the repository's name from the `origin` URL; when that isn't a usable directory name, it asks. It stops if `~/Developer/<name>/main` already exists, unless that's the checkout you ran it from, in which case it skips the clone.
+2. Copies the root-level `.env`, `.env.*` and `.dev.vars` files the original checkout ignores into the new `main/`, and lists them: your secrets now live in both places. It stops rather than overwrite one `origin`'s `main` tracks.
+3. Creates a `chore/suede-install` worktree beside `main/` off `origin/main`, linking the env files in as `suede task` does.
+4. Writes suede's `task`, `review`, `project-plan` and `orient` skills and every agent into `.claude/`, suede's `CLAUDE.md` as `SUEDE_CLAUDE.md`, and `"suede": { "from": "<tag>", "versioning": "<scheme>" }` at the end of `package.json`, inferring the scheme from the version and asking when it can't. A skill or agent the project already had is replaced and listed. It won't write through a symlink the repository tracks.
+
+It doesn't commit, push or open a pull request. Before cloning, it lists uncommitted changes and branches that were never pushed or have commits `origin` lacks, since the clone won't have them, and asks before going on. It refuses a project that already has `suede.from`; use `suede update` there.
+
+Merge what applies from `SUEDE_CLAUDE.md` into your `CLAUDE.md` and delete it: suede's skills read their rules from `CLAUDE.md`. `design`, `writing-css` and `suede-kickoff` aren't installed, and `suede update` keeps them out.
+
 ## Checking the version
 
 ```bash
