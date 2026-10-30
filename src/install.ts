@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { constants, existsSync, lstatSync, realpathSync } from 'node:fs';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -71,6 +71,23 @@ export function repoNameFromUrl(url: string): string {
 		.at(-1)!;
 }
 
+/**
+ * Throws when any existing segment of `path` under `root` is a symlink. origin
+ * can track one (say `.claude` linked to a shared directory), and a write through
+ * it would land outside the worktree.
+ */
+function assertNoSymlink(root: string, path: string): void {
+	let current = root;
+	for (const segment of path.split('/')) {
+		current = join(current, segment);
+		if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink()) {
+			throw new Error(
+				`${tildify(current)} is a symlink in origin's main; install won't write ${path} through it.`
+			);
+		}
+	}
+}
+
 /** Every file suede installs, as paths relative to the template root. */
 async function processLayerFiles(template: string, tag: string): Promise<string[]> {
 	const files: string[] = [];
@@ -104,7 +121,18 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 		await mkdir(dirname(plan.projectDir), { recursive: true });
 		await run('git', ['clone', '--quiet', plan.origin, plan.projectDir]);
 		for (const name of await listEnvFiles(plan.source)) {
-			await copyFile(join(plan.source, name), join(plan.projectDir, name));
+			// Exclusive: origin's main may now track a file the source checkout still ignores.
+			await copyFile(
+				join(plan.source, name),
+				join(plan.projectDir, name),
+				constants.COPYFILE_EXCL
+			).catch((error: NodeJS.ErrnoException) => {
+				if (error.code !== 'EEXIST') throw error;
+				throw new Error(
+					`origin's main tracks ${name}, which this checkout ignores, so install won't copy yours over it. Untrack it on main first.`,
+					{ cause: error }
+				);
+			});
 		}
 	} else {
 		await run('git', ['fetch', '--quiet', 'origin', 'main'], plan.projectDir);
@@ -122,6 +150,7 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 	const envFiles = await linkEnvFiles(plan.projectDir, worktree);
 
 	const manifestPath = join(worktree, 'package.json');
+	assertNoSymlink(worktree, 'package.json');
 	if (!existsSync(manifestPath)) {
 		throw new Error(`origin/main has no package.json, so there's nowhere to record suede.from.`);
 	}
@@ -135,6 +164,7 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 		['CLAUDE.md', SUEDE_CLAUDE_MD]
 	];
 	for (const [from, to] of copies) {
+		assertNoSymlink(worktree, to);
 		const destination = join(worktree, to);
 		if (existsSync(destination)) replaced.push(to);
 		await mkdir(dirname(destination), { recursive: true });
