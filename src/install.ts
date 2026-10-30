@@ -98,6 +98,9 @@ async function processLayerFiles(template: string, tag: string): Promise<string[
 		}
 		files.push(...(await listFiles(join(template, directory))).map((file) => directory + file));
 	}
+	if (!existsSync(join(template, AGENTS))) {
+		throw new Error(`suede ${tag} has no ${AGENTS}; install's layout is out of date.`);
+	}
 	files.push(...(await listFiles(join(template, AGENTS))).map((file) => AGENTS + file));
 	return files;
 }
