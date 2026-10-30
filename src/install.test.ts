@@ -105,7 +105,8 @@ describe('install', () => {
 			projectDir,
 			template,
 			tag: '2026.10.28.2',
-			versioning: 'chronver'
+			versioning: 'chronver',
+			css: false
 		});
 
 		// <container>/<repo>/main, cloned from origin, on main.
