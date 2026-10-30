@@ -1,12 +1,10 @@
 import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import * as prompts from '@clack/prompts';
 import { KICKOFF_BRANCH, bootstrapSteps } from './bootstrap.ts';
 import { copyToClipboard } from './clipboard.ts';
 import { isInstalled } from './exec.ts';
 import { findMissingTools, REQUIRED_TOOLS } from './preflight.ts';
-import { validateProjectName } from './project-name.ts';
+import { projectDirFor, validateProjectName } from './project-name.ts';
 import { createRemote, type Visibility } from './remote.ts';
 import { paint, tildify, wordmark } from './style.ts';
 import { resolveLatestTag } from './template.ts';
@@ -22,10 +20,6 @@ function exitIfCancelled<T>(value: T): Exclude<T, symbol> {
 		process.exit(0);
 	}
 	return value as Exclude<T, symbol>;
-}
-
-function projectDirFor(name: string): string {
-	return join(homedir(), 'Developer', name, 'main');
 }
 
 function validateDestination(name: string | undefined): string | undefined {

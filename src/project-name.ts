@@ -1,3 +1,6 @@
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
 const PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 /** Returns an error message, or undefined when the name is usable as a directory and package name. */
@@ -8,4 +11,9 @@ export function validateProjectName(name: string | undefined): string | undefine
 		return 'Use lowercase letters, digits, and hyphens, starting with a letter or digit.';
 	}
 	return undefined;
+}
+
+/** `~/Developer/<name>/main`: the project's main checkout, inside its container. */
+export function projectDirFor(name: string): string {
+	return join(homedir(), 'Developer', name, 'main');
 }
