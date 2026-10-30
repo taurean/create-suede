@@ -2,6 +2,7 @@
 import { parse } from '@bomb.sh/args';
 import * as prompts from '@clack/prompts';
 import { DONE_USAGE, runDone } from '../done.ts';
+import { INSTALL_USAGE, runInstall } from '../install.ts';
 import { NEW_USAGE, runNew } from '../new.ts';
 import { RELEASE_USAGE, runRelease, runReleaseTag } from '../release.ts';
 import { runStatus, STATUS_USAGE } from '../status.ts';
@@ -15,6 +16,7 @@ Commands:
   new [name]              ${NEW_USAGE}
   task <type>/<slug>      ${TASK_USAGE}
   done                    ${DONE_USAGE}
+  install [name]          ${INSTALL_USAGE}
   release [level] [--tag] ${RELEASE_USAGE}
   status                  ${STATUS_USAGE}
   update                  ${UPDATE_USAGE}
@@ -32,6 +34,7 @@ const COMMANDS: Record<string, (rest: string[]) => Promise<void>> = {
 	new: (rest) => runNew(rest[0]),
 	task: (rest) => runTask(rest[0]),
 	done: () => runDone(),
+	install: (rest) => runInstall(rest[0]),
 	release: (rest) => (args.tag ? runReleaseTag() : runRelease(rest[0])),
 	status: () => runStatus(),
 	update: () => runUpdate()

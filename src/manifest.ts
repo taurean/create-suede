@@ -92,6 +92,22 @@ export function replaceVersionText(
 	);
 }
 
+/**
+ * Appends `"suede": { "from", "versioning" }` as package.json's last field, as
+ * text, so the diff is the added lines. Throws when the manifest already has one.
+ */
+export function addSuedeField(source: string, from: string, versioning: Versioning): string {
+	if ((JSON.parse(source) as { suede?: unknown }).suede !== undefined) {
+		throw new Error('package.json already has a "suede" field.');
+	}
+	const indent = detectIndent(source);
+	const close = source.lastIndexOf('}');
+	const body = source.slice(0, close).trimEnd();
+	const field = JSON.stringify({ from, versioning }, null, indent).replaceAll('\n', `\n${indent}`);
+	const separator = body.endsWith('{') ? '' : ',';
+	return `${body}${separator}\n${indent}"suede": ${field}\n${source.slice(close)}`;
+}
+
 const SUEDE_CSS = '@taurean/suede-css';
 
 interface Dependencies {
