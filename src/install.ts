@@ -187,49 +187,52 @@ function exitIfCancelled<T>(value: T): Exclude<T, symbol> {
 	return value as Exclude<T, symbol>;
 }
 
-interface LocalBranch {
-	name: string;
-	/** The upstream's short name, or undefined when the branch tracks nothing. */
-	upstream: string | undefined;
-	/** Commits on the branch that its upstream doesn't have. */
-	ahead: number;
-	/** The upstream was deleted on the remote. */
-	gone: boolean;
-}
-
-/** Parses `git for-each-ref --format='%(refname:short)%00%(upstream:short)%00%(upstream:track)'`. */
-export function parseLocalBranches(output: string): LocalBranch[] {
-	return output
-		.split('\n')
-		.filter(Boolean)
-		.map((line) => {
-			const [name = '', upstream = '', track = ''] = line.split('\0');
-			return {
-				name,
-				upstream: upstream || undefined,
-				ahead: Number(/ahead (\d+)/.exec(track)?.[1] ?? 0),
-				gone: track === '[gone]'
-			};
-		});
-}
-
 /**
- * What a fresh clone of `origin` won't carry over from the original checkout,
- * one line per item, for the warning before cloning. Empty when nothing is lost.
+ * What a fresh clone of origin won't carry over from the original repository,
+ * one line per item: uncommitted changes in any of its worktrees, stashes, and
+ * commits on local branches that no `origin/*` ref reaches. Reads origin's refs
+ * as last fetched, so it never writes to the original repository.
  */
-export function unpushedWork(branches: LocalBranch[], uncommitted: boolean): string[] {
-	const lost = uncommitted ? ['uncommitted changes in this checkout'] : [];
+export async function findUnpushedWork(source: string): Promise<string[]> {
+	const lost: string[] = [];
+	for (const worktree of await listWorktrees(source)) {
+		// A worktree whose directory was deleted is listed until `git worktree prune`.
+		if (!existsSync(worktree.path)) continue;
+		if (await isDirty(worktree.path)) lost.push(`${tildify(worktree.path)}: uncommitted changes`);
+	}
+	const stashes = (await run('git', ['stash', 'list'], source)).split('\n').filter(Boolean).length;
+	if (stashes > 0) lost.push(`${stashes} stash${stashes === 1 ? '' : 'es'}`);
+	const branches = (
+		await run('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads'], source)
+	)
+		.split('\n')
+		.filter(Boolean);
 	for (const branch of branches) {
-		// A gone upstream is almost always a merged branch whose remote copy was deleted.
-		if (branch.gone) continue;
-		if (!branch.upstream) lost.push(`${branch.name}: never pushed`);
-		else if (branch.ahead > 0) {
-			lost.push(
-				`${branch.name}: ${branch.ahead} commit${branch.ahead === 1 ? '' : 's'} not on origin`
-			);
-		}
+		const count = Number(
+			(
+				await run(
+					'git',
+					['rev-list', '--count', `refs/heads/${branch}`, '--not', '--remotes=origin'],
+					source
+				)
+			).trim()
+		);
+		if (count > 0) lost.push(`${branch}: ${count} commit${count === 1 ? '' : 's'} not on origin`);
 	}
 	return lost;
+}
+
+/** Throws unless origin's default branch is `main`, which every suede command assumes. */
+async function assertMainIsDefault(source: string): Promise<void> {
+	const head = await run('git', ['ls-remote', '--symref', 'origin', 'HEAD'], source);
+	const branch = /^ref: refs\/heads\/(\S+)\tHEAD$/m.exec(head)?.[1];
+	if (branch !== 'main') {
+		throw new Error(
+			branch
+				? `origin's default branch is ${branch}, not main. suede's commands assume main.`
+				: "origin has no default branch (is it empty?). suede's commands assume main."
+		);
+	}
 }
 
 async function askName(argument: string | undefined, origin: string): Promise<string> {
@@ -289,6 +292,7 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 		throw new Error('This repository has no origin remote. suede install clones from origin.');
 	}
 	const origin = (await run('git', ['remote', 'get-url', 'origin'], source)).trim();
+	await assertMainIsDefault(source);
 
 	const name = await askName(nameArgument, origin);
 	const projectDir = projectDirFor(name);
@@ -298,18 +302,7 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 
 	// Only a clone loses anything; an existing projectDir is the source checkout itself.
 	if (!existsSync(projectDir)) {
-		const branches = parseLocalBranches(
-			await run(
-				'git',
-				[
-					'for-each-ref',
-					'--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)',
-					'refs/heads'
-				],
-				source
-			)
-		);
-		const lost = unpushedWork(branches, await isDirty(gitRoot));
+		const lost = await findUnpushedWork(source);
 		if (lost.length > 0) {
 			prompts.log.warn(
 				`The clone comes from origin, so it won't have:\n${lost.map((line) => `  ${line}`).join('\n')}`
@@ -325,16 +318,11 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 	}
 
 	const spinner = prompts.spinner({ indicator: 'timer' });
-	spinner.start('Checking origin');
+	spinner.start('Finding the latest suede release');
 	const downloads = await mkdtemp(join(tmpdir(), 'suede-install-'));
 	let report: InstallReport;
 	let tag: string;
 	try {
-		const heads = await run('git', ['ls-remote', '--heads', 'origin', 'main'], source);
-		if (!heads.trim()) {
-			throw new Error(`origin has no main branch. suede's commands assume main.`);
-		}
-		spinner.message('Finding the latest suede release');
 		tag = (await resolveLatestTag()).tag;
 		spinner.message(`Downloading suede ${tag}`);
 		await downloadTemplate(tag, downloads);
