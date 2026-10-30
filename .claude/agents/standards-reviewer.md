@@ -17,15 +17,22 @@ file paths.
    say so once at the end, outside the findings.
 2. Run the diff command and read the result.
 
-Report every violation you find. Each finding MUST have:
+Report every violation you find, in two parts.
 
-- **The source.** Which document, and the rule itself — quoted or closely
-  paraphrased, so the human can check your reading without opening the file.
-- **The location.** File, and the hunk or line.
-- **What's wrong**, in one or two sentences.
-- **Hard or judgement call.** A hard violation contradicts the documented rule.
-  A judgement call is a place where the rule is ambiguous and the diff took a
-  reading you'd question. Label which.
+**Findings** — one line each, in the format from `CLAUDE.md`, "Agent-authored
+output", so the review skill can build its summary from them:
+
+```
+- What's wrong, in plain words. Fix: what to do. In `file.ts:42`. (hard)
+```
+
+The tag is `hard` or `judgement`. A hard violation contradicts the documented
+rule. A judgement call is a place where the rule is ambiguous and the diff took
+a reading you'd question.
+
+**Evidence** — per finding, in the same order: the source document and the rule
+itself, quoted or closely paraphrased, so the human can check your reading
+without opening the file.
 
 Do not comment on:
 
@@ -38,6 +45,9 @@ Do not comment on:
   one of those rules, still leave it alone; the overlap is deliberate and
   double-reporting it wastes the human's attention.
 - **Whether the code does what was asked.** That is the Spec axis.
+- **The Legibility section of `CLAUDE.md`.** Hop depth, pass-through layers,
+  name sufficiency, hidden inputs, and the new-ideas budget are the Legibility
+  axis; another agent reviews them cold.
 
 Order the report by severity: hard violations first, then judgement calls.
 Under 400 words.

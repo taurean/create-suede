@@ -90,7 +90,7 @@ fit a task, compress it but keep the shape.
 | 3. **Cut plan**                                                   | `/project-plan`       | Only when the work cannot land as one PR. One plan issue with a cut checklist, never an issue per cut    |
 | 4. **Build**                                                      | `/task`               | Every task: prep (worktree, systems map, brief, draft PR), then vertical slices with story-derived tests |
 | 5. **Verify**                                                     | `/task` step 4        | Every task, before review. The CLI observed doing the thing, not a green suite                           |
-| 6. **Review**                                                     | `/review`             | Three-axis review — Standards, Spec, Discipline — in parallel subagents, before merge                    |
+| 6. **Review**                                                     | `/review`             | Four-axis review — Standards, Spec, Discipline, Legibility — in parallel subagents, before merge         |
 | 7. **Release**                                                    | This file, "Releases" | Version bump as the final commit on the release branch; human tags the merge commit on `main`            |
 
 **Always-on supporting layer** — not stages, they run throughout:
@@ -108,6 +108,73 @@ publishes the plan issue and `/review` reads specs. When no tracker is
 configured, the plan lives in the first cut's PR description and review falls
 back to the PR body's brief.
 
+## Legibility
+
+Most code here is generated, and it's read by people who weren't there when it
+was written. Write for the time it takes someone unoriented to understand one
+unit — a function or command — and to debug it. People hold about four
+half-understood ideas at once; every layer that makes them hold one more is a
+cost.
+
+This covers hand-written code: source and tests. Not generated files, `dist/`,
+lockfiles, config, or markdown.
+
+### What reading a unit costs
+
+- **Read cost** — the lines a reader actually reads to understand the unit: the
+  unit itself plus every hop they have to follow. Shorter is better, until
+  shortness makes code confusing, brittle, or opaque.
+  - When **understanding**, a reader skips hops whose name and signature say
+    what they do.
+  - When **debugging**, names stop helping: the question is whether the code
+    does what its name says. The reader follows every hop on the failing path,
+    except ones they can check at the boundary.
+- **Linearity** — how often a top-to-bottom read has to leave the unit. Code
+  that needs a reading order explained isn't linear.
+- **Name sufficiency** — whether a hop's name and signature predict what it
+  does. A hop that does is free to a reader who's understanding, not debugging.
+- **Hop depth** — how many hops a reader has to follow before reaching ground
+  they already know: the language, Node, or a well-known library. A
+  name-sufficient hop isn't followed, so it doesn't count.
+- **Concepts held open** — the most half-understood things a reader has to keep
+  in mind at once.
+- **Pass-through layer** — a layer that, inlined, would cost the reader nothing:
+  a wrapper that forwards its arguments, a single-use helper whose name says
+  less than its body, an options object with one caller.
+- **Explicit boundary** — an extracted unit's inputs are its arguments, and its
+  effects are its return value or named by it (`writeManifest`, not `process`).
+  A hidden input is anything read from outside the arguments, except
+  module-level `const` and imports from Node or the standard library.
+  `process.env`, `process.cwd()`, `process.argv`, and module-level mutable
+  state count as hidden. A unit with an explicit boundary can be checked from
+  the call site — what went in, what came out — without stepping into it.
+
+### Writing to it
+
+- Extract only when the name lets a reader skip the body. Otherwise, inline.
+- Keep inputs in the arguments. Read process state (`process.env`,
+  `process.cwd()`, `process.argv`) in the command's entry point, and pass the
+  value down.
+- Extend a pattern the codebase already has before introducing a new one.
+- `const` by default; `let` only for a binding that's reassigned.
+
+### What blocks merge
+
+`/review`'s legibility reviewer blocks on:
+
+- hop depth over 2;
+- any pass-through layer;
+- an extraction whose name doesn't predict what it does;
+- an extraction with hidden inputs or unnamed effects;
+- more than **3** new ideas in one PR without a reason in the PR body. A new
+  idea is a new exported name or dependency, or the first instance of a pattern
+  the codebase didn't have. A new module isn't counted apart from its exports:
+  one file exporting one function is one idea.
+
+Read cost, linearity, and concepts held open are advisory: reported where
+they're high, as findings, never as numbers. A diff over about 400 changed lines
+of hand-written code is noted, never blocked.
+
 ## Working style
 
 The pipeline table above says which skill applies at which stage. Load the
@@ -118,15 +185,20 @@ In-repo skills (`.claude/skills/`), copied from suede:
 - `task` — the task spine, user-invoked. `brief.md` owns the brief format;
   `testing.md` owns test quality and the prune pass.
 - `project-plan` — cut plan for work too big for one PR. User-invoked.
-- `review` — three-axis review, dispatching to the in-repo reviewer agents.
+- `review` — four-axis review, dispatching to the in-repo reviewer agents.
+- `orient` — render the current work unit as a visual page in `tmp/`.
+  User-invoked; never run it on your own. Offer it once, in one line, when the
+  brief's reversibility line names something hard to undo, or when the human
+  shows they've lost the thread: asking what something is for or why it's
+  there, or returning to a branch after time away.
 
 Suede's `writing-css`, `design`, and `suede-kickoff` skills are left out: the
 first two govern a UI this project doesn't have, and kickoff only runs in a
 project the CLI just created.
 
-In-repo agents (`.claude/agents/`): `standards-reviewer`, `spec-reviewer`, and
-`discipline-reviewer` (dispatched by `review`), and `story-test-writer`
-(dispatched by `task`).
+In-repo agents (`.claude/agents/`): `standards-reviewer`, `spec-reviewer`,
+`discipline-reviewer`, and `legibility-reviewer` (dispatched by `review`), and
+`story-test-writer` (dispatched by `task`).
 
 Personal skills live in `~/.claude/skills/` and are not enumerated here.
 `engineering-discipline`, `poke-holes`, and `systems-map` are the ones this
@@ -142,6 +214,54 @@ would never run for anyone who has the personal one.
 closeout. Alongside it, every commit carries the co-authorship trailer.
 Verification and release mechanics have their own sections below. The merge to
 `main` is human-only.
+
+## Agent-authored output
+
+Everything an agent writes on GitHub — PR bodies, `/review` reports, closeout
+comments — has two readers: the human deciding what to do, and the next agent
+picking up the work. They need different things, so each gets its own part.
+
+**The human summary comes first**, at most about ten lines. Lead with the
+verdict: whether anything blocks, or what the human needs to decide. Then one
+line per item they act on:
+
+```
+- What's wrong, in plain words. Fix: what to do. In `file.ts:42`.
+```
+
+The problem comes first, because it's what the reader needs to decide whether
+to keep reading. Location comes last: a bare file name when it's unambiguous, a
+path when it isn't, and every file named on its own — never a `{a,b}` set.
+Labels a reader can skip, like a category or severity, go after the location in
+parentheses.
+
+Nothing goes in the summary that the human doesn't act on. If it runs past ten
+lines and not every line is an action, detail has leaked in; move it down.
+
+**Everything for agents goes below, collapsed:**
+
+```
+<details>
+<summary>For agents</summary>
+
+The brief, full reports, reasoning, evidence.
+
+</details>
+```
+
+The blank lines inside the block are required; GitHub doesn't render markdown
+without them.
+
+| Surface                  | Summary                                                                     | Collapsed                  |
+| ------------------------ | --------------------------------------------------------------------------- | -------------------------- |
+| PR body                  | What changed, why, where the human's judgement is needed, verification line | The brief                  |
+| `/review` report         | Verdict, then one line per blocking finding, synthesized across reviewers   | Each reviewer's raw report |
+| `/task` closeout comment | Merge verdict, where to focus, one line per open question                   | Reasoning behind each      |
+
+**Agent comments start with a marker** on their first line —
+`<!-- suede:review -->` or `<!-- suede:closeout -->`. `/review` reads PR comments
+as spec and skips any whose first line is a `suede:` marker, so a past review
+never gets read as a requirement.
 
 ## Releases
 
