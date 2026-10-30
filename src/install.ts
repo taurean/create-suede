@@ -88,10 +88,14 @@ function assertNoSymlink(root: string, path: string): void {
 	}
 }
 
-/** Every file suede installs, as paths relative to the template root. */
-async function processLayerFiles(template: string, tag: string): Promise<string[]> {
+/** The named skills' files plus every agent, as paths relative to the template root. */
+async function skillAndAgentFiles(
+	template: string,
+	tag: string,
+	skills: string[]
+): Promise<string[]> {
 	const files: string[] = [];
-	for (const skill of PROCESS_SKILLS) {
+	for (const skill of skills) {
 		const directory = `.claude/skills/${skill}/`;
 		if (!existsSync(join(template, directory))) {
 			throw new Error(`suede ${tag} has no ${directory}; install's skill list is out of date.`);
@@ -161,7 +165,7 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 	const written: string[] = [];
 	const replaced: string[] = [];
 	const copies: [from: string, to: string][] = [
-		...(await processLayerFiles(plan.template, plan.tag)).map(
+		...(await skillAndAgentFiles(plan.template, plan.tag, PROCESS_SKILLS)).map(
 			(path) => [path, path] as [string, string]
 		),
 		['CLAUDE.md', SUEDE_CLAUDE_MD]
