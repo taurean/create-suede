@@ -11,14 +11,21 @@ export function defaultVersion(versioning: Versioning, date = new Date()): strin
 	return versioning === 'chronver' ? todayChronver(date) : '0.1.0';
 }
 
+/** The scheme a version string uses, or undefined when it's neither chronver nor plain semver. */
+export function detectVersioning(version: string): Versioning | undefined {
+	if (parseChronver(version)) return 'chronver';
+	if (SEMVER_PATTERN.test(version)) return 'semver';
+	return undefined;
+}
+
 /**
  * The scheme a project recorded, or, for projects made before `suede.versioning`
  * existed, the one its version string uses.
  */
 export function resolveVersioning(recorded: unknown, version: string): Versioning {
 	if (recorded === 'chronver' || recorded === 'semver') return recorded;
-	if (parseChronver(version)) return 'chronver';
-	if (SEMVER_PATTERN.test(version)) return 'semver';
+	const detected = detectVersioning(version);
+	if (detected) return detected;
 	throw new Error(
 		`Can't tell the version scheme: package.json has no suede.versioning and "${version}" is neither chronver nor semver.`
 	);
