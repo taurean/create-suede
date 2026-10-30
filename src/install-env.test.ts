@@ -83,7 +83,8 @@ describe('install', () => {
 			projectDir,
 			template,
 			tag: '1.0.0',
-			versioning: 'semver'
+			versioning: 'semver',
+			css: false
 		});
 
 		expect([...report.envFiles].sort()).toEqual(envFiles);

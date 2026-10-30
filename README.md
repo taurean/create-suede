@@ -39,7 +39,9 @@ Run it from any checkout of a repository that has a `package.json` and an `origi
 
 It doesn't commit, push or open a pull request. Before cloning, it lists uncommitted changes and branches that were never pushed or have commits `origin` lacks, since the clone won't have them, and asks before going on. It refuses a project that already has `suede.from`; use `suede update` there.
 
-Merge what applies from `SUEDE_CLAUDE.md` into your `CLAUDE.md` and delete it: suede's skills read their rules from `CLAUDE.md`. `design`, `writing-css` and `suede-kickoff` aren't installed, and `suede update` keeps them out.
+For a SvelteKit project that installs with pnpm (`@sveltejs/kit` in `package.json`, and a `pnpm-lock.yaml` or a `packageManager` naming pnpm), it also asks, before cloning, whether to add suede-css. Yes writes the `design` and `writing-css` skills and runs `pnpm add @taurean/suede-css@<suede's range>` in the worktree. It doesn't import it: add `@import '@taurean/suede-css';` to your global stylesheet yourself. Any other project isn't asked, and one line says what it lacks.
+
+Merge what applies from `SUEDE_CLAUDE.md` into your `CLAUDE.md` and delete it: suede's skills read their rules from `CLAUDE.md`. `suede-kickoff` isn't installed, and neither are `design` and `writing-css` when suede-css wasn't added; `suede update` keeps every skill install left out, out.
 
 ## Checking the version
 

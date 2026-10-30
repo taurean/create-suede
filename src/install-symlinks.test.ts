@@ -79,7 +79,8 @@ describe('install and tracked symlinks', () => {
 				projectDir: join(container, 'widget', 'main'),
 				template,
 				tag: '2026.10.28.2',
-				versioning: 'semver'
+				versioning: 'semver',
+				css: false
 			})
 		).rejects.toThrow(/\.claude.*symlink/);
 
@@ -101,7 +102,8 @@ describe('install and tracked symlinks', () => {
 				projectDir: join(container, 'widget', 'main'),
 				template,
 				tag: '2026.10.28.2',
-				versioning: 'semver'
+				versioning: 'semver',
+				css: false
 			})
 		).rejects.toThrow(/\.env/);
 

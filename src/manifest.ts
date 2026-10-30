@@ -108,14 +108,14 @@ export function addSuedeField(source: string, from: string, versioning: Versioni
 	return `${body}${separator}\n${indent}"suede": ${field}\n${source.slice(close)}`;
 }
 
-const SUEDE_CSS = '@taurean/suede-css';
+export const SUEDE_CSS = '@taurean/suede-css';
 
 interface Dependencies {
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
 }
 
-function suedeCssRange(source: string): string | undefined {
+export function suedeCssRange(source: string): string | undefined {
 	const manifest = JSON.parse(source) as Dependencies;
 	return manifest.dependencies?.[SUEDE_CSS] ?? manifest.devDependencies?.[SUEDE_CSS];
 }
