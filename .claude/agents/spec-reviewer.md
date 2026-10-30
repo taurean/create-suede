@@ -33,11 +33,20 @@ test that maps to no story. The story list is the test list: one story, one
 test, no more and no less. Judge the test by whether it would fail if the
 story's behavior broke, not by whether it exists.
 
-Each finding MUST have:
+Report in two parts.
 
-- **The spec line**, quoted, so the human can check your reading.
-- **The location** in the diff, or a note that the location is the absence.
-- **What's wrong**, in one or two sentences.
+**Findings** — one line each, in the format from `CLAUDE.md`, "Agent-authored
+output", so the review skill can build its summary from them:
+
+```
+- What's wrong, in plain words. Fix: what to do. In `file.ts:42`. (wrong)
+```
+
+The tag is `wrong`, `missing`, `mismatch`, or `unasked`. For a missing
+requirement, the location is where it should have landed.
+
+**Evidence** — per finding, in the same order: the spec line, quoted, so the
+human can check your reading.
 
 Do not comment on:
 

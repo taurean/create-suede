@@ -9,7 +9,7 @@
 		"url": "git+https://github.com/taurean/create-suede.git"
 	},
 	"suede": {
-		"from": "2026.10.21.3",
+		"from": "2026.10.28.2",
 		"versioning": "semver"
 	},
 	"bin": {
