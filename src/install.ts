@@ -192,7 +192,7 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 }
 
 /**
- * Why the project at `source` can't take suede-css, or undefined when it can.
+ * Why a project with this manifest can't take suede-css, or undefined when it can.
  * suede-css is a SvelteKit design layer, and parts that add dependencies are
  * pnpm-only, matching suede task.
  */
@@ -402,24 +402,10 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 		await rm(downloads, { recursive: true, force: true });
 	}
 
-	if (cssRange) {
-		spinner.message(`Adding ${SUEDE_CSS} ${cssRange}`);
-		try {
-			await run('pnpm', ['add', `${SUEDE_CSS}@${cssRange}`], report.worktree);
-		} catch (error) {
-			spinner.error(
-				`suede's files are in ${tildify(report.worktree)}, but ${SUEDE_CSS} wasn't added. Run pnpm add ${SUEDE_CSS}@${cssRange} there, or delete its design and writing-css skills.`
-			);
-			throw error;
-		}
-	}
 	spinner.stop(
 		`Installed suede ${paint('bold', tag)} on ${paint('bold', INSTALL_BRANCH)}, uncommitted`
 	);
 	prompts.log.message(`Written\n${report.written.map((path) => `  ${path}`).join('\n')}`);
-	if (cssRange) {
-		prompts.log.message(`Added ${SUEDE_CSS} ${cssRange} to package.json, not yet imported`);
-	}
 	if (report.replaced.length > 0) {
 		prompts.log.message(
 			`${paint('yellow', "Replaced the project's own copy")}\n${report.replaced.map((path) => `  ${path}`).join('\n')}`
@@ -439,6 +425,20 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 		prompts.log.message(
 			paint('dim', `${tildify(source)} is untouched. Remove it once you've moved over.`)
 		);
+	}
+
+	// Last, so a registry failure can't hide the notices above: they're true either way.
+	if (cssRange) {
+		spinner.start(`Adding ${SUEDE_CSS} ${cssRange}`);
+		try {
+			await run('pnpm', ['add', `${SUEDE_CSS}@${cssRange}`], report.worktree);
+		} catch (error) {
+			spinner.error(
+				`suede's files are in ${tildify(report.worktree)}, but ${SUEDE_CSS} wasn't added. Run pnpm add ${SUEDE_CSS}@${cssRange} there, or delete its design and writing-css skills.`
+			);
+			throw error;
+		}
+		spinner.stop(`Added ${SUEDE_CSS} ${cssRange} to package.json, not yet imported`);
 	}
 
 	const cdCommand = `cd ${tildify(report.worktree)}`;

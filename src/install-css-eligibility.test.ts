@@ -12,10 +12,10 @@ it('skips suede-css with one line naming what the project lacks, and offers it w
 	expect(noKit).not.toContain('pnpm-lock.yaml');
 	expect(noKit).not.toContain('\n');
 
-	const noLockfile = suedeCssSkipReason({ devDependencies: { '@sveltejs/kit': '^2.0.0' } }, false);
-	expect(noLockfile).toContain('pnpm-lock.yaml');
-	expect(noLockfile).not.toContain('@sveltejs/kit');
-	expect(noLockfile).not.toContain('\n');
+	const noPnpm = suedeCssSkipReason({ devDependencies: { '@sveltejs/kit': '^2.0.0' } }, false);
+	expect(noPnpm).toContain('pnpm-lock.yaml');
+	expect(noPnpm).not.toContain('@sveltejs/kit');
+	expect(noPnpm).not.toContain('\n');
 
 	const noManifestDeps = suedeCssSkipReason({}, true);
 	expect(noManifestDeps).toContain('@sveltejs/kit');
