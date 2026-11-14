@@ -10,9 +10,12 @@ export interface ProjectFields {
 
 type Manifest = Record<string, unknown>;
 
-/** Applies the project's identity to suede's package.json, keeping field order. */
+/**
+ * Applies the project's identity to suede's package.json, keeping field order.
+ * Drops `suedeInstall`: it describes suede's skills to install, not the new project.
+ */
 export function applyToPackageJson(manifest: Manifest, fields: ProjectFields): Manifest {
-	const { suede: _previousLineage, ...rest } = manifest;
+	const { suede: _previousLineage, suedeInstall: _suedesSkillLists, ...rest } = manifest;
 	return {
 		...rest,
 		name: fields.name,
@@ -108,16 +111,32 @@ export function addSuedeField(source: string, from: string, versioning: Versioni
 	return `${body}${separator}\n${indent}"suede": ${field}\n${source.slice(close)}`;
 }
 
-const SUEDE_CSS = '@taurean/suede-css';
+export const SUEDE_CSS = '@taurean/suede-css';
 
 interface Dependencies {
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
 }
 
-function suedeCssRange(source: string): string | undefined {
+export function suedeCssRange(source: string): string | undefined {
 	const manifest = JSON.parse(source) as Dependencies;
 	return manifest.dependencies?.[SUEDE_CSS] ?? manifest.devDependencies?.[SUEDE_CSS];
+}
+
+/** The skills suede install copies: `process` always, `css` alongside suede-css. */
+export interface SkillLists {
+	process: string[];
+	css: string[];
+}
+
+/** suede's own `package.json#suedeInstall`, or undefined when it's missing or not two lists of names. */
+export function suedeInstallSkills(source: string): SkillLists | undefined {
+	const lists = (JSON.parse(source) as { suedeInstall?: { process?: unknown; css?: unknown } })
+		.suedeInstall;
+	const isNames = (value: unknown): value is string[] =>
+		Array.isArray(value) && value.every((name) => typeof name === 'string');
+	if (!lists || !isNames(lists.process) || !isNames(lists.css)) return undefined;
+	return { process: lists.process, css: lists.css };
 }
 
 function escapeRegExp(text: string): string {

@@ -6,8 +6,8 @@ import * as prompts from '@clack/prompts';
 import { copyToClipboard } from './clipboard.ts';
 import { linkEnvFiles, listEnvFiles } from './env-files.ts';
 import { run } from './exec.ts';
-import { addSuedeField } from './manifest.ts';
-import { findGitRoot, NOT_A_GIT_REPO } from './project.ts';
+import { addSuedeField, SUEDE_CSS, suedeCssRange, suedeInstallSkills } from './manifest.ts';
+import { findGitRoot, NOT_A_GIT_REPO, usesPnpm } from './project.ts';
 import { projectDirFor, validateProjectName } from './project-name.ts';
 import { paint, tildify } from './style.ts';
 import { downloadTemplate, listFiles, resolveLatestTag } from './template.ts';
@@ -19,8 +19,6 @@ export const INSTALL_USAGE =
 
 export const INSTALL_BRANCH = 'chore/suede-install';
 
-/** suede's process skills. `design` and `writing-css` assume suede-css; kickoff refuses non-bootstrapped repos. */
-const PROCESS_SKILLS = ['task', 'review', 'project-plan', 'orient'];
 const AGENTS = '.claude/agents/';
 
 /** suede's CLAUDE.md, under a name that can't collide with the project's. Kickoff merges it. */
@@ -37,6 +35,8 @@ export interface InstallPlan {
 	template: string;
 	tag: string;
 	versioning: Versioning;
+	/** Write suede's CSS skills too, the `css` list in its package.json#suedeInstall. The caller adds the suede-css package. */
+	css: boolean;
 }
 
 export interface InstallReport {
@@ -50,6 +50,8 @@ export interface InstallReport {
 	replaced: string[];
 	/** Env files copied into `projectDir` (when cloned) and linked into the worktree. */
 	envFiles: string[];
+	/** The CSS skills written, by name; empty unless `plan.css`. */
+	cssSkills: string[];
 }
 
 function sameDirectory(a: string, b: string): boolean {
@@ -88,13 +90,19 @@ function assertNoSymlink(root: string, path: string): void {
 	}
 }
 
-/** Every file suede installs, as paths relative to the template root. */
-async function processLayerFiles(template: string, tag: string): Promise<string[]> {
+/** The named skills' files plus every agent, as paths relative to the template root. */
+async function skillAndAgentFiles(
+	template: string,
+	tag: string,
+	skills: string[]
+): Promise<string[]> {
 	const files: string[] = [];
-	for (const skill of PROCESS_SKILLS) {
+	for (const skill of skills) {
 		const directory = `.claude/skills/${skill}/`;
 		if (!existsSync(join(template, directory))) {
-			throw new Error(`suede ${tag} has no ${directory}; install's skill list is out of date.`);
+			throw new Error(
+				`suede ${tag} lists ${skill} in package.json#suedeInstall but has no ${directory}.`
+			);
 		}
 		files.push(...(await listFiles(join(template, directory))).map((file) => directory + file));
 	}
@@ -118,6 +126,14 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 	const worktree = siblingPath(plan.projectDir, INSTALL_BRANCH);
 	if (existsSync(worktree)) {
 		throw new Error(`${tildify(worktree)} already exists. Finish or remove that install first.`);
+	}
+
+	// Before cloning, so a suede tag without the lists fails with nothing left behind.
+	const lists = suedeInstallSkills(await readFile(join(plan.template, 'package.json'), 'utf8'));
+	if (!lists) {
+		throw new Error(
+			`suede ${plan.tag} doesn't list its skills in package.json#suedeInstall; install needs suede 2026.11.14.1 or later.`
+		);
 	}
 
 	if (cloned) {
@@ -160,8 +176,10 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 
 	const written: string[] = [];
 	const replaced: string[] = [];
+	const cssSkills = plan.css ? lists.css : [];
+	const skills = [...lists.process, ...cssSkills];
 	const copies: [from: string, to: string][] = [
-		...(await processLayerFiles(plan.template, plan.tag)).map(
+		...(await skillAndAgentFiles(plan.template, plan.tag, skills)).map(
 			(path) => [path, path] as [string, string]
 		),
 		['CLAUDE.md', SUEDE_CLAUDE_MD]
@@ -179,7 +197,26 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 	await writeFile(manifestPath, addSuedeField(manifest, plan.tag, plan.versioning));
 	written.push('package.json');
 
-	return { worktree, cloned, written, replaced, envFiles };
+	return { worktree, cloned, written, replaced, envFiles, cssSkills };
+}
+
+/**
+ * Why a project with this manifest can't take suede-css, or undefined when it can.
+ * suede-css is a SvelteKit design layer, and parts that add dependencies are
+ * pnpm-only, matching suede task.
+ */
+export function suedeCssSkipReason(
+	manifest: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> },
+	pnpm: boolean
+): string | undefined {
+	const hasKit =
+		manifest.dependencies?.['@sveltejs/kit'] !== undefined ||
+		manifest.devDependencies?.['@sveltejs/kit'] !== undefined;
+	const missing = [
+		...(hasKit ? [] : ['@sveltejs/kit in package.json']),
+		...(pnpm ? [] : ['pnpm-lock.yaml or "packageManager" naming pnpm'])
+	];
+	return missing.length > 0 ? `this project has no ${missing.join(' and no ')}.` : undefined;
 }
 
 function exitIfCancelled<T>(value: T): Exclude<T, symbol> {
@@ -285,6 +322,8 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 	const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as {
 		version?: unknown;
 		suede?: { from?: unknown };
+		dependencies?: Record<string, string>;
+		devDependencies?: Record<string, string>;
 	};
 	if (manifest.suede?.from !== undefined) {
 		throw new Error(
@@ -302,6 +341,16 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 	const taken = destinationError(projectDir, source);
 	if (taken) throw new Error(taken);
 	const versioning = await askVersioning(manifest.version);
+	const cssSkipReason = suedeCssSkipReason(manifest, usesPnpm(source));
+	if (cssSkipReason) prompts.log.info(`Skipping suede-css: ${cssSkipReason}`);
+	const css =
+		!cssSkipReason &&
+		exitIfCancelled(
+			await prompts.confirm({
+				message: `Add ${SUEDE_CSS} with suede's design and CSS skills?`,
+				initialValue: true
+			})
+		);
 
 	// Only a clone loses anything; an existing projectDir is the source checkout itself.
 	if (!existsSync(projectDir)) {
@@ -325,14 +374,32 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 	const downloads = await mkdtemp(join(tmpdir(), 'suede-install-'));
 	let report: InstallReport;
 	let tag: string;
+	/** suede's own suede-css range when the developer chose it: the one suede's skills are written against, and suede update keeps raising. */
+	let cssRange: string | undefined;
 	try {
 		tag = (await resolveLatestTag()).tag;
 		spinner.message(`Downloading suede ${tag}`);
 		await downloadTemplate(tag, downloads);
+		if (css) {
+			cssRange = suedeCssRange(await readFile(join(downloads, 'package.json'), 'utf8'));
+			if (!cssRange) {
+				throw new Error(
+					`suede ${tag} doesn't list ${SUEDE_CSS} in its package.json; install's suede-css step is out of date.`
+				);
+			}
+		}
 		spinner.message(
 			existsSync(projectDir) ? `Creating ${INSTALL_BRANCH}` : `Cloning into ${tildify(projectDir)}`
 		);
-		report = await install({ source, origin, projectDir, template: downloads, tag, versioning });
+		report = await install({
+			source,
+			origin,
+			projectDir,
+			template: downloads,
+			tag,
+			versioning,
+			css
+		});
 	} catch (error) {
 		spinner.error(
 			existsSync(projectDir) && !sameDirectory(projectDir, source)
@@ -367,6 +434,20 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 		prompts.log.message(
 			paint('dim', `${tildify(source)} is untouched. Remove it once you've moved over.`)
 		);
+	}
+
+	// Last, so a registry failure can't hide the notices above: they're true either way.
+	if (cssRange) {
+		spinner.start(`Adding ${SUEDE_CSS} ${cssRange}`);
+		try {
+			await run('pnpm', ['add', `${SUEDE_CSS}@${cssRange}`], report.worktree);
+		} catch (error) {
+			spinner.error(
+				`suede's files are in ${tildify(report.worktree)}, but ${SUEDE_CSS} wasn't added. Run pnpm add ${SUEDE_CSS}@${cssRange} there, or delete the skills that need it: ${report.cssSkills.join(', ')}.`
+			);
+			throw error;
+		}
+		spinner.stop(`Added ${SUEDE_CSS} ${cssRange} to package.json, not yet imported`);
 	}
 
 	const cdCommand = `cd ${tildify(report.worktree)}`;

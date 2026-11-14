@@ -73,7 +73,8 @@ describe('install destination', () => {
 				projectDir,
 				template,
 				tag: 'v1.0.0',
-				versioning: 'semver'
+				versioning: 'semver',
+				css: false
 			})
 		).rejects.toThrow(projectDir);
 

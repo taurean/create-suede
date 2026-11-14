@@ -43,7 +43,8 @@ function listFiles(dir: string, prefix = ''): string[] {
 }
 
 const PROCESS_SKILLS = ['task', 'review', 'project-plan', 'orient'];
-const OTHER_SKILLS = ['design', 'writing-css', 'suede-kickoff'];
+const CSS_SKILLS = ['design', 'writing-css'];
+const OTHER_SKILLS = [...CSS_SKILLS, 'suede-kickoff'];
 const AGENTS = ['standards-reviewer.md', 'spec-reviewer.md', 'story-test-writer.md'];
 
 /**
@@ -86,7 +87,13 @@ describe('install', () => {
 			write(join(template, '.claude', 'agents', agent), `# ${agent}\n`);
 		}
 		write(join(template, 'CLAUDE.md'), '# suede CLAUDE.md\n');
-		write(join(template, 'package.json'), JSON.stringify({ name: 'suede' }) + '\n');
+		write(
+			join(template, 'package.json'),
+			JSON.stringify({
+				name: 'suede',
+				suedeInstall: { process: PROCESS_SKILLS, css: CSS_SKILLS }
+			}) + '\n'
+		);
 		write(join(template, 'src', 'routes', '+page.svelte'), '<h1>suede</h1>\n');
 	});
 
@@ -105,7 +112,8 @@ describe('install', () => {
 			projectDir,
 			template,
 			tag: '2026.10.28.2',
-			versioning: 'chronver'
+			versioning: 'chronver',
+			css: false
 		});
 
 		// <container>/<repo>/main, cloned from origin, on main.
@@ -165,5 +173,36 @@ describe('install', () => {
 		expect(git(source, 'rev-parse', 'HEAD')).toBe(sourceHeadBefore);
 		expect(listFiles(source)).toEqual(sourceFilesBefore);
 		expect(read(join(source, 'package.json'))).toBe(sourcePackageBefore);
+	});
+
+	it('refuses a suede tag whose package.json has no suedeInstall field, naming the field and the minimum suede version, before cloning anything', async () => {
+		write(join(template, 'package.json'), JSON.stringify({ name: 'suede' }) + '\n');
+
+		const attempt = install({
+			source,
+			origin,
+			projectDir,
+			template,
+			tag: '2026.10.28.2',
+			versioning: 'chronver',
+			css: false
+		});
+
+		await expect(attempt).rejects.toThrow(/package\.json#suedeInstall/);
+		await expect(attempt).rejects.toThrow(/2026\.11\.14\.1 or later/);
+
+		// Nothing was cloned: no projectDir, and no git checkout anywhere in
+		// the container besides the developer's original one.
+		expect(existsSync(projectDir)).toBe(false);
+		const checkouts: string[] = [];
+		const findCheckouts = (dir: string): void => {
+			for (const entry of readdirSync(dir, { withFileTypes: true })) {
+				const path = join(dir, entry.name);
+				if (entry.name === '.git') checkouts.push(dir);
+				else if (entry.isDirectory() && path !== origin) findCheckouts(path);
+			}
+		};
+		findCheckouts(container);
+		expect(checkouts).toEqual([source]);
 	});
 });
