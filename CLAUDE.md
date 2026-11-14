@@ -192,8 +192,9 @@ In-repo skills (`.claude/skills/`), copied from suede:
   shows they've lost the thread: asking what something is for or why it's
   there, or returning to a branch after time away.
 
-Suede's `writing-css`, `design`, and `suede-kickoff` skills are left out: the
-first two govern a UI this project doesn't have, and kickoff only runs in a
+Suede's design and CSS skills (the `css` list in its
+`package.json#suedeInstall`) and `suede-kickoff` are left out: the design and
+CSS skills govern a UI this project doesn't have, and kickoff only runs in a
 project the CLI just created.
 
 In-repo agents (`.claude/agents/`): `standards-reviewer`, `spec-reviewer`,

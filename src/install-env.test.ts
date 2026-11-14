@@ -70,6 +70,13 @@ describe('install', () => {
 		}
 		write(template, '.claude/agents/spec-reviewer.md', '# spec-reviewer\n');
 		write(template, 'CLAUDE.md', '# CLAUDE.md\n');
+		write(
+			template,
+			'package.json',
+			JSON.stringify({
+				suedeInstall: { process: ['task', 'review', 'project-plan', 'orient'], css: [] }
+			}) + '\n'
+		);
 	});
 
 	afterEach(() => rmSync(container, { recursive: true, force: true }));

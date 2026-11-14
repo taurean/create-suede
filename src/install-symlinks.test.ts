@@ -58,6 +58,12 @@ describe('install and tracked symlinks', () => {
 		}
 		write(join(template, '.claude', 'agents', 'spec-reviewer.md'), '# spec-reviewer\n');
 		write(join(template, 'CLAUDE.md'), '# CLAUDE.md\n');
+		write(
+			join(template, 'package.json'),
+			JSON.stringify({
+				suedeInstall: { process: ['task', 'review', 'project-plan', 'orient'], css: [] }
+			}) + '\n'
+		);
 	});
 
 	afterEach(() => rmSync(container, { recursive: true, force: true }));

@@ -6,7 +6,7 @@ import * as prompts from '@clack/prompts';
 import { copyToClipboard } from './clipboard.ts';
 import { linkEnvFiles, listEnvFiles } from './env-files.ts';
 import { run } from './exec.ts';
-import { addSuedeField, SUEDE_CSS, suedeCssRange } from './manifest.ts';
+import { addSuedeField, SUEDE_CSS, suedeCssRange, suedeInstallSkills } from './manifest.ts';
 import { findGitRoot, NOT_A_GIT_REPO, usesPnpm } from './project.ts';
 import { projectDirFor, validateProjectName } from './project-name.ts';
 import { paint, tildify } from './style.ts';
@@ -19,10 +19,6 @@ export const INSTALL_USAGE =
 
 export const INSTALL_BRANCH = 'chore/suede-install';
 
-/** suede's process skills. Kickoff isn't among them: it refuses non-bootstrapped repos. */
-const PROCESS_SKILLS = ['task', 'review', 'project-plan', 'orient'];
-/** suede's design skills, written only alongside the suede-css package they assume. */
-const CSS_SKILLS = ['design', 'writing-css'];
 const AGENTS = '.claude/agents/';
 
 /** suede's CLAUDE.md, under a name that can't collide with the project's. Kickoff merges it. */
@@ -39,7 +35,7 @@ export interface InstallPlan {
 	template: string;
 	tag: string;
 	versioning: Versioning;
-	/** Write suede's design skills too. The caller adds the suede-css package. */
+	/** Write suede's CSS skills too, the `css` list in its package.json#suedeInstall. The caller adds the suede-css package. */
 	css: boolean;
 }
 
@@ -54,6 +50,8 @@ export interface InstallReport {
 	replaced: string[];
 	/** Env files copied into `projectDir` (when cloned) and linked into the worktree. */
 	envFiles: string[];
+	/** The CSS skills written, by name; empty unless `plan.css`. */
+	cssSkills: string[];
 }
 
 function sameDirectory(a: string, b: string): boolean {
@@ -102,7 +100,9 @@ async function skillAndAgentFiles(
 	for (const skill of skills) {
 		const directory = `.claude/skills/${skill}/`;
 		if (!existsSync(join(template, directory))) {
-			throw new Error(`suede ${tag} has no ${directory}; install's skill list is out of date.`);
+			throw new Error(
+				`suede ${tag} lists ${skill} in package.json#suedeInstall but has no ${directory}.`
+			);
 		}
 		files.push(...(await listFiles(join(template, directory))).map((file) => directory + file));
 	}
@@ -126,6 +126,14 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 	const worktree = siblingPath(plan.projectDir, INSTALL_BRANCH);
 	if (existsSync(worktree)) {
 		throw new Error(`${tildify(worktree)} already exists. Finish or remove that install first.`);
+	}
+
+	// Before cloning, so a suede tag without the lists fails with nothing left behind.
+	const lists = suedeInstallSkills(await readFile(join(plan.template, 'package.json'), 'utf8'));
+	if (!lists) {
+		throw new Error(
+			`suede ${plan.tag} doesn't list its skills in package.json#suedeInstall; install needs suede 2026.11.14.1 or later.`
+		);
 	}
 
 	if (cloned) {
@@ -168,7 +176,8 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 
 	const written: string[] = [];
 	const replaced: string[] = [];
-	const skills = plan.css ? [...PROCESS_SKILLS, ...CSS_SKILLS] : PROCESS_SKILLS;
+	const cssSkills = plan.css ? lists.css : [];
+	const skills = [...lists.process, ...cssSkills];
 	const copies: [from: string, to: string][] = [
 		...(await skillAndAgentFiles(plan.template, plan.tag, skills)).map(
 			(path) => [path, path] as [string, string]
@@ -188,7 +197,7 @@ export async function install(plan: InstallPlan): Promise<InstallReport> {
 	await writeFile(manifestPath, addSuedeField(manifest, plan.tag, plan.versioning));
 	written.push('package.json');
 
-	return { worktree, cloned, written, replaced, envFiles };
+	return { worktree, cloned, written, replaced, envFiles, cssSkills };
 }
 
 /**
@@ -338,7 +347,7 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 		!cssSkipReason &&
 		exitIfCancelled(
 			await prompts.confirm({
-				message: `Add ${SUEDE_CSS} with the design and writing-css skills?`,
+				message: `Add ${SUEDE_CSS} with suede's design and CSS skills?`,
 				initialValue: true
 			})
 		);
@@ -434,7 +443,7 @@ export async function runInstall(nameArgument: string | undefined): Promise<void
 			await run('pnpm', ['add', `${SUEDE_CSS}@${cssRange}`], report.worktree);
 		} catch (error) {
 			spinner.error(
-				`suede's files are in ${tildify(report.worktree)}, but ${SUEDE_CSS} wasn't added. Run pnpm add ${SUEDE_CSS}@${cssRange} there, or delete its design and writing-css skills.`
+				`suede's files are in ${tildify(report.worktree)}, but ${SUEDE_CSS} wasn't added. Run pnpm add ${SUEDE_CSS}@${cssRange} there, or delete the skills that need it: ${report.cssSkills.join(', ')}.`
 			);
 			throw error;
 		}

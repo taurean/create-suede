@@ -74,7 +74,13 @@ describe('install with css', () => {
 			write(join(template, '.claude', 'agents', agent), `# ${agent}\n`);
 		}
 		write(join(template, 'CLAUDE.md'), '# suede CLAUDE.md\n');
-		write(join(template, 'package.json'), JSON.stringify({ name: 'suede' }) + '\n');
+		write(
+			join(template, 'package.json'),
+			JSON.stringify({
+				name: 'suede',
+				suedeInstall: { process: PROCESS_SKILLS, css: CSS_SKILLS }
+			}) + '\n'
+		);
 	});
 
 	afterEach(() => rmSync(container, { recursive: true, force: true }));

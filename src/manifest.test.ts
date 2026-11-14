@@ -32,6 +32,28 @@ describe('applyToPackageJson', () => {
 			suede: { from: '2026.9.29', versioning: 'chronver' }
 		});
 	});
+
+	it("drops suede's suedeInstall skill lists from the new project, keeping other fields", () => {
+		const result = applyToPackageJson(
+			{
+				name: 'suede',
+				private: true,
+				version: '1',
+				scripts: { test: 'vitest' },
+				suedeInstall: { process: ['task', 'review'], css: ['writing-css'] }
+			},
+			fields
+		);
+		expect(result).not.toHaveProperty('suedeInstall');
+		expect(result).toEqual({
+			private: true,
+			scripts: { test: 'vitest' },
+			name: 'example',
+			version: '2026.9.29',
+			description: 'An example',
+			suede: { from: '2026.9.29', versioning: 'chronver' }
+		});
+	});
 });
 
 describe('applyToPackageLock', () => {
