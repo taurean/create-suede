@@ -39,6 +39,14 @@ lint failures.
 - `package.json#suede` records which suede tag this repo's own setup came from
   (`from`) and its version scheme (`versioning`). The `suede` commands read
   this same field in the projects they manage.
+- Never run `suede update` in this repository. Because `package.json#suede`
+  marks it as a suede project, `suede update` would merge suede's
+  `.claude/skills/` and `.claude/agents/` back in (`MERGE_AREAS` in
+  `src/update.ts`).
+- Process state (working directory, arguments, environment) is read in each
+  command's `run*` entry function and passed down, e.g.
+  `findProjectRoot(process.cwd())` in `src/release.ts`. Helpers take it as an
+  argument. Known exception: `readProjectFrom()` in `src/version.ts`.
 
 ## Versions and publishing
 
@@ -47,8 +55,9 @@ lint failures.
   lives in `package.json#version`.
 - The version changes when a release is cut, not on every branch.
   `suede release [patch|minor|major]` makes the bump commit, and
-  `suede release --tag` tags the merge commit on `main` with the bare version
-  string.
+  `suede release --tag` tags the head of `origin/main` (the merge commit) with
+  the bare version string, annotated, and pushes the tag to `origin` when there
+  is one.
 - Publishing to npm is done by the human, never by an agent. It cannot be
   undone: a published version number can never be used again.
 - Merges to `main` are done by the human.
