@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { chronverTags } from './chronver.ts';
 import type { Lookup } from './lookup.ts';
 import { measureDrift, type Drift } from './template.ts';
-import { formatVersionReport, upgradeCommand, type VersionReport } from './version.ts';
+import { formatVersionReport, runVersion, upgradeCommand, type VersionReport } from './version.ts';
+
+// suede's tags come from `git ls-remote`. No test here stubs a child process, so the
+// project function that runs it is replaced with two fixed tags instead.
+vi.mock('./template.ts', async (importOriginal) => ({
+	...(await importOriginal<typeof import('./template.ts')>()),
+	fetchTemplateTags: async () =>
+		chronverTags(['2026.10.21', '2026.10.26'].map((tag) => `abc\trefs/tags/${tag}`).join('\n'))
+}));
 
 const current: VersionReport = {
 	installed: '0.7.1',
@@ -97,5 +108,47 @@ describe('upgradeCommand', () => {
 		expect(upgradeCommand('/usr/local/lib/node_modules/create-suede/dist/suede.mjs')).toBe(
 			'npm install -g create-suede@latest'
 		);
+	});
+});
+
+describe('runVersion', () => {
+	let scratch = '';
+
+	beforeEach(() => {
+		scratch = mkdtempSync(join(tmpdir(), 'suede-version-'));
+	});
+
+	afterEach(() => {
+		rmSync(scratch, { recursive: true, force: true });
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	});
+
+	/**
+	 * Runs the version command as if started in `directory` and returns what it printed.
+	 * The npm registry (`fetch`) and suede's tags (`fetchTemplateTags`, mocked at the top
+	 * of this file) are answered locally, so no network is touched.
+	 */
+	async function versionOutputIn(directory: string): Promise<string> {
+		vi.spyOn(process, 'cwd').mockReturnValue(directory);
+		vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ latest: '0.7.1' })));
+		const printed: string[] = [];
+		vi.spyOn(console, 'log').mockImplementation((line: string) => void printed.push(line));
+		await runVersion();
+		return printed.join('\n');
+	}
+
+	it("shows the project's suede.from when run inside a suede project", async () => {
+		writeFileSync(
+			join(scratch, 'package.json'),
+			JSON.stringify({ name: 'scratch', suede: { from: '2026.10.21' } })
+		);
+		expect(await versionOutputIn(scratch)).toMatch(/suede\.from\s+2026\.10\.21/);
+	});
+
+	it('leaves out suede.from when run outside a suede project', async () => {
+		const output = await versionOutputIn(scratch);
+		expect(output).toMatch(/create-suede\s+0\.\d+\.\d+/);
+		expect(output).not.toContain('suede.from');
 	});
 });

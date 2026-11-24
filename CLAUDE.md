@@ -43,10 +43,15 @@ lint failures.
   marks it as a suede project, `suede update` would merge suede's
   `.claude/skills/` and `.claude/agents/` back in (`MERGE_AREAS` in
   `src/update.ts`).
-- Process state (working directory, arguments, environment) is read in each
-  command's `run*` entry function and passed down, e.g.
-  `findProjectRoot(process.cwd())` in `src/release.ts`. Helpers take it as an
-  argument. Known exception: `readProjectFrom()` in `src/version.ts`.
+- The working directory is read in each command's `run*` entry function and
+  passed down, e.g. `findProjectRoot(process.cwd())` in `src/release.ts`.
+  Command-line arguments are parsed in the two bin entry files
+  (`src/bin/suede.ts`, `src/bin/create-suede.ts`) and passed to `run*` as
+  values. The one exception is `runVersion()`, which reads `process.argv[1]`
+  itself to find where the CLI is installed. Helpers do not read the working
+  directory, arguments, or environment variables; they take them as arguments.
+  They may read the platform, the home directory, and what the terminal
+  supports.
 
 ## Versions and publishing
 

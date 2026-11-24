@@ -50,8 +50,8 @@ async function fetchNpmLatest(): Promise<string> {
 	return latest;
 }
 
-function readProjectFrom(): string | undefined {
-	const root = findProjectRoot(process.cwd());
+function readProjectFrom(start: string): string | undefined {
+	const root = findProjectRoot(start);
 	if (!root) return undefined;
 	const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 	return (manifest as { suede: { from: string } }).suede.from;
@@ -120,7 +120,7 @@ export async function runVersion(): Promise<void> {
 	]);
 	// One ls-remote serves both the latest tag and the drift; neither makes its own call.
 	const suedeLatest = derive(tags, (value) => latestTemplateTag(value).tag);
-	const from = readProjectFrom();
+	const from = readProjectFrom(process.cwd());
 	const project =
 		from === undefined
 			? undefined
