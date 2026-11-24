@@ -321,4 +321,6 @@ Never:
   common ancestor. Never point a verification run at a real project or at the
   real `~/Developer/<name>` path without the human's say-so.
 
+CI runs the same four commands on every pull request and on `main`.
+
 Claim done with evidence: command plus result.
