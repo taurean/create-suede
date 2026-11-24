@@ -46,7 +46,7 @@ lint failures.
 - Process state (working directory, arguments, environment) is read in each
   command's `run*` entry function and passed down, e.g.
   `findProjectRoot(process.cwd())` in `src/release.ts`. Helpers take it as an
-  argument. Known exception: `readProjectFrom()` in `src/version.ts`.
+  argument.
 
 ## Versions and publishing
 

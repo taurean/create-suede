@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { chronverTags } from './chronver.ts';
 import type { Lookup } from './lookup.ts';
 import { measureDrift, type Drift } from './template.ts';
-import { formatVersionReport, upgradeCommand, type VersionReport } from './version.ts';
+import { formatVersionReport, runVersion, upgradeCommand, type VersionReport } from './version.ts';
+
+vi.mock('./template.ts', async (importOriginal) => ({
+	...(await importOriginal<typeof import('./template.ts')>()),
+	fetchTemplateTags: async () =>
+		chronverTags(['2026.10.21', '2026.10.26'].map((tag) => `abc\trefs/tags/${tag}`).join('\n'))
+}));
 
 const current: VersionReport = {
 	installed: '0.7.1',
@@ -97,5 +106,43 @@ describe('upgradeCommand', () => {
 		expect(upgradeCommand('/usr/local/lib/node_modules/create-suede/dist/suede.mjs')).toBe(
 			'npm install -g create-suede@latest'
 		);
+	});
+});
+
+describe('runVersion', () => {
+	const startDirectory = process.cwd();
+	let scratch = '';
+	let printed: string[] = [];
+
+	beforeEach(() => {
+		scratch = mkdtempSync(join(tmpdir(), 'suede-version-'));
+		printed = [];
+		vi.spyOn(console, 'log').mockImplementation((line: string) => void printed.push(line));
+		vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ latest: '0.7.1' })));
+	});
+
+	afterEach(() => {
+		process.chdir(startDirectory);
+		rmSync(scratch, { recursive: true, force: true });
+		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
+	});
+
+	it("shows the project's suede.from when run inside a suede project", async () => {
+		writeFileSync(
+			join(scratch, 'package.json'),
+			JSON.stringify({ name: 'scratch', suede: { from: '2026.10.21' } })
+		);
+		process.chdir(scratch);
+		await runVersion();
+		expect(printed.join('\n')).toMatch(/suede\.from\s+2026\.10\.21/);
+	});
+
+	it('leaves out suede.from when run outside a suede project', async () => {
+		process.chdir(scratch);
+		await runVersion();
+		const output = printed.join('\n');
+		expect(output).toMatch(/suede latest\s+2026\.10\.26/);
+		expect(output).not.toContain('suede.from');
 	});
 });
