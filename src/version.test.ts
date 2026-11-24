@@ -147,6 +147,8 @@ describe('runVersion', () => {
 	});
 
 	it('leaves out suede.from when run outside a suede project', async () => {
-		expect(await versionOutputIn(scratch)).not.toContain('suede.from');
+		const output = await versionOutputIn(scratch);
+		expect(output).toMatch(/create-suede\s+0\.\d+\.\d+/);
+		expect(output).not.toContain('suede.from');
 	});
 });
